@@ -181,8 +181,8 @@ def dump():
     # Convert links
     json_topology['links'] = [
         {
-            'source': json_topology['nodes'][link['source']]['id'],
-            'target': json_topology['nodes'][link['target']]['id'],
+            'source': link['source'],
+            'target': link['target'],
             'lhs_intf': link['lhs_intf'],
             'rhs_intf': link['rhs_intf'],
             'lhs_ip': str((ipaddress.ip_interface(link['lhs_ip'])).ip),
