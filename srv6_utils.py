@@ -31,6 +31,7 @@ from mininet.node import Host
 import re
 import os
 import shutil
+import time
 
 # Abstraction to model a SRv6Router
 class SRv6Router(Host):
@@ -75,6 +76,8 @@ class SRv6Router(Host):
     self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
     # Disable RA accept
     self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
+    # Force Linux to keep all IPv6 addresses on an interface down event
+    self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
     # Iterate over the interfaces
     for intf in self.intfs.itervalues():
       # Enable IPv6 forwarding
@@ -119,6 +122,8 @@ class SRv6Router(Host):
       self.cmd("chmod 640 %s/*.conf" %self.dir)
       # Starting daemons
       self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i %s/zebra.pid" %(self.dir, self.dir, self.dir))
+      # In some systems this workaround solves the issue of ospf6d coming up before zebra 
+      time.sleep(.001)
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
 
   # Clean up the environment
