@@ -104,7 +104,7 @@ class SRv6Router(Host):
           ospfd.write("interface %s\n!ipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\n!\n"
             %(net['intf'], cost, 600))
         else:
-          ospfd.write("interface %s\nipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\n!\n"
+          ospfd.write("interface %s\nipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\nipv6 ospf6 dead-interval 3\nipv6 ospf6 retransmit-interval 3\n!\n"
             %(net['intf'], cost, 1))
         zebra.write("interface %s\nlink-detect\nno ipv6 nd suppress-ra\nipv6 nd ra-interval %s\nipv6 address %s\nipv6 nd prefix %s\n!\n"
           %(net['intf'], ra_interval, net['ip'], net['net']))
