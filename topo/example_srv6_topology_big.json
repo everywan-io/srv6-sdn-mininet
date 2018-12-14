@@ -1,0 +1,556 @@
+{
+   "edges":[
+
+      {
+         "source":"nyc",
+         "target":"hnyc",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"chi",
+         "target":"hchi",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"wdc",
+         "target":"hwdc",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source": "sea",
+         "target": "hsea",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"sun",
+         "target":"hsun",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"lan",
+         "target":"hlan",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"den",
+         "target":"hden",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"kan",
+         "target":"hkan",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"hou",
+         "target":"hhou",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"atl",
+         "target":"hatl",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"ind",
+         "target":"hind",
+         "view": "Data",
+         "type": "Edge",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"nyc",
+         "target":"chi",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"nyc",
+         "target":"wdc",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"chi",
+         "target":"ind",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"wdc",
+         "target":"atl",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },{
+         "source":"sea",
+         "target":"sun",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },{
+         "source":"sea",
+         "target":"den",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },{
+         "source":"sun",
+         "target":"lan",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"sun",
+         "target":"den",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"lan",
+         "target":"hou",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"den",
+         "target":"kan",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"kan",
+         "target":"hou",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"kan",
+         "target":"ind",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+       {
+         "source":"hou",
+         "target":"atl",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      },
+      {
+         "source":"atl",
+         "target":"ind",
+         "view": "Data",
+         "type": "Core",
+	 "info": {
+	   "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+	 }
+      }
+
+   ],
+   "vertices":[
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "sea"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "ind"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 2
+        },
+        "group": [2]
+      },
+      "id": "hchi"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 0
+        },
+        "group": [100]
+      },
+      "id": "hatl"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 3
+        },
+        "group": [3]
+      },
+      "id": "hsun"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "sun"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "hou"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 0
+        },
+        "group": [100]
+      },
+      "id": "hind"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "nyc"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 2
+        },
+        "group": [2]
+      },
+      "id": "hsea"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "lan"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "kan"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 0
+        },
+        "group": [100]
+      },
+      "id": "hnyc"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 0
+        },
+        "group": [100]
+      },
+      "id": "hkan"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "wdc"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "atl"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 4
+        },
+        "group": [4]
+      },
+      "id": "hhou"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+           "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "den"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "vnf": 0
+        },
+        "group": [200]
+      },
+      "id": "chi"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 4
+        },
+        "group": [4]
+      },
+      "id": "hden"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 3
+        },
+        "group": [3]
+      },
+      "id": "hwdc"
+     },
+     {
+      "info": {
+        "type": "Server",
+        "property": {
+          "vnf": 4
+        },
+        "group": [4]
+      },
+      "id": "hlan"
+     }
+
+   ],
+   "graph_parameters":{
+        "bw": 1,
+        "delay": 1000,
+        "testbed":"MININET"
+     }
+}
