@@ -33,6 +33,9 @@ import os
 import shutil
 import time
 
+#Path to the gRPC server
+GRPC_SERVER_PATH = "../srv6-controller/grpc/grpc_server.py"
+
 # Abstraction to model a SRv6Router
 class SRv6Router(Host):
 
@@ -125,6 +128,8 @@ class SRv6Router(Host):
       # In some systems this workaround solves the issue of ospf6d coming up before zebra 
       time.sleep(.001)
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
+      # Starting gRPC server
+      self.cmd("python %s &" % GRPC_SERVER_PATH)
 
   # Clean up the environment
   def cleanup(self):
