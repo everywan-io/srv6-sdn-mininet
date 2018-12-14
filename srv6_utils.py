@@ -134,3 +134,56 @@ class SRv6Router(Host):
       shutil.rmtree(self.dir)
 
 
+class MHost(Host):
+
+  def __init__(self, name, *args, **kwargs):
+    dirs = ['/var/mininet']
+    Host.__init__(self, name, privateDirs=dirs, *args, **kwargs)
+    self.dir = "/tmp/%s" % name
+    self.nets = []
+    if not os.path.exists(self.dir):
+      os.makedirs(self.dir)
+
+  # Config hook
+  def config(self, **kwargs):
+    # Init steps
+    Host.config(self, **kwargs)
+    # Iterate over the interfaces
+    first = True
+    for intf in self.intfs.itervalues():
+      # Remove any configured address
+      #self.cmd('ifconfig %s 0' %intf.name)
+      # For the first one, let's configure the mgmt address
+      if first:
+        first = False
+        self.cmd('ip a a %s dev %s' %(kwargs['mgmtip'], intf.name))
+    #let's write the hostname in /var/mininet/hostname
+    self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
+    # Retrieve nets
+    if kwargs.get('nets', None):
+      self.nets = kwargs['nets']
+    # If requested
+    if kwargs['sshd']:
+      # Let's start sshd daemon in the hosts
+      self.cmd('/usr/sbin/sshd -D &')
+    for net in self.nets:
+      # Remove any configured address
+      #self.cmd('ifconfig %s 0' %net['intf'])
+      self.cmd('ip a a %s dev %s' %(net['ip'], net['intf']))
+    # Force Linux to keep all IPv6 addresses on an interface down event
+    self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
+    # Disable IPv6 address autoconfiguration
+    self.cmd('sysctl -w net.ipv6.conf.all.autoconf=1')
+    self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
+    # Iterate over the interfaces
+    for intf in self.intfs.itervalues():
+      # Disable IPv6 address autoconfiguration on the interface
+      self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=1" %intf.name)
+      self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" %intf.name)
+
+  # Clean up the environment
+  def cleanup(self):
+    Host.cleanup(self)
+    # Rm dir
+    if os.path.exists(self.dir):
+      shutil.rmtree(self.dir)
