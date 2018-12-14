@@ -122,6 +122,8 @@ class SRv6Router(Host):
       # Right permission and owners
       self.cmd("chown quagga.quaggavty %s/*.conf" %self.dir)
       self.cmd("chown quagga.quaggavty %s/." %self.dir)
+      self.cmd("chown quagga %s/*.conf" %self.dir)
+      self.cmd("chown quagga %s/." %self.dir)
       self.cmd("chmod 640 %s/*.conf" %self.dir)
       # Starting daemons
       self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i %s/zebra.pid" %(self.dir, self.dir, self.dir))
