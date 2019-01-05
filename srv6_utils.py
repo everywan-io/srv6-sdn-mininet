@@ -33,6 +33,10 @@ import os
 import shutil
 import time
 
+#Path to the gRPC server
+CONTROL_PLANE_FOLDER = "/home/user/repos/srv6-sdn-data-plane/"
+SB_GRPC_SERVER_PATH = CONTROL_PLANE_FOLDER + "southbound/grpc/sb_grpc_server.py"
+
 # Abstraction to model a SRv6Router
 class SRv6Router(Host):
 
@@ -101,7 +105,7 @@ class SRv6Router(Host):
           ospfd.write("interface %s\n!ipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\n!\n"
             %(net['intf'], cost, 600))
         else:
-          ospfd.write("interface %s\nipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\n!\n"
+          ospfd.write("interface %s\nipv6 ospf6 cost %s\nipv6 ospf6 hello-interval %s\nipv6 ospf6 dead-interval 3\nipv6 ospf6 retransmit-interval 3\n!\n"
             %(net['intf'], cost, 1))
         zebra.write("interface %s\nlink-detect\nno ipv6 nd suppress-ra\nipv6 nd ra-interval %s\nipv6 address %s\nipv6 nd prefix %s\n!\n"
           %(net['intf'], ra_interval, net['ip'], net['net']))
@@ -119,12 +123,16 @@ class SRv6Router(Host):
       # Right permission and owners
       self.cmd("chown quagga.quaggavty %s/*.conf" %self.dir)
       self.cmd("chown quagga.quaggavty %s/." %self.dir)
+      self.cmd("chown quagga %s/*.conf" %self.dir)
+      self.cmd("chown quagga %s/." %self.dir)
       self.cmd("chmod 640 %s/*.conf" %self.dir)
       # Starting daemons
       self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i %s/zebra.pid" %(self.dir, self.dir, self.dir))
       # In some systems this workaround solves the issue of ospf6d coming up before zebra 
       time.sleep(.001)
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
+      # Starting gRPC server
+      self.cmd("python %s &" % SB_GRPC_SERVER_PATH)
 
   # Clean up the environment
   def cleanup(self):
@@ -134,3 +142,56 @@ class SRv6Router(Host):
       shutil.rmtree(self.dir)
 
 
+class MHost(Host):
+
+  def __init__(self, name, *args, **kwargs):
+    dirs = ['/var/mininet']
+    Host.__init__(self, name, privateDirs=dirs, *args, **kwargs)
+    self.dir = "/tmp/%s" % name
+    self.nets = []
+    if not os.path.exists(self.dir):
+      os.makedirs(self.dir)
+
+  # Config hook
+  def config(self, **kwargs):
+    # Init steps
+    Host.config(self, **kwargs)
+    # Iterate over the interfaces
+    first = True
+    for intf in self.intfs.itervalues():
+      # Remove any configured address
+      #self.cmd('ifconfig %s 0' %intf.name)
+      # For the first one, let's configure the mgmt address
+      if first:
+        first = False
+        self.cmd('ip a a %s dev %s' %(kwargs['mgmtip'], intf.name))
+    #let's write the hostname in /var/mininet/hostname
+    self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
+    # Retrieve nets
+    if kwargs.get('nets', None):
+      self.nets = kwargs['nets']
+    # If requested
+    if kwargs['sshd']:
+      # Let's start sshd daemon in the hosts
+      self.cmd('/usr/sbin/sshd -D &')
+    for net in self.nets:
+      # Remove any configured address
+      #self.cmd('ifconfig %s 0' %net['intf'])
+      self.cmd('ip a a %s dev %s' %(net['ip'], net['intf']))
+    # Force Linux to keep all IPv6 addresses on an interface down event
+    self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
+    # Disable IPv6 address autoconfiguration
+    self.cmd('sysctl -w net.ipv6.conf.all.autoconf=1')
+    self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
+    # Iterate over the interfaces
+    for intf in self.intfs.itervalues():
+      # Disable IPv6 address autoconfiguration on the interface
+      self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=1" %intf.name)
+      self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" %intf.name)
+
+  # Clean up the environment
+  def cleanup(self):
+    Host.cleanup(self)
+    # Rm dir
+    if os.path.exists(self.dir):
+      shutil.rmtree(self.dir)

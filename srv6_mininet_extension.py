@@ -75,21 +75,31 @@ class SRv6Topo(Topo):
         # Save parsed data
         self.routers = parser.getRouters()
         p_routers_properties = parser.getRoutersProperties()
+        self._hosts = parser.getHosts()
+        p_hosts_properties = parser.getHostsProperties()
         self.core_links = parser.getCoreLinks()
         p_core_links_properties = parser.getCoreLinksProperties()
+        self.edge_links = parser.getEdgeLinks()
+        p_edge_links_properties = parser.getEdgeLinksProperties()
         # Properties generator
         generator = PropertiesGenerator()
         mgmtAllocator = MgmtAllocator()
         # Second step is the generation of the nodes parameters
+        # Generation of the routers parameters
         routers_properties = generator.getRoutersProperties(self.routers)
         for router_properties, p_router_properties in zip(routers_properties, p_routers_properties):
             p_router_properties['loopback'] = router_properties.loopback
             p_router_properties['routerid'] = router_properties.routerid
             p_router_properties['mgmtip'] = mgmtAllocator.nextMgmtAddress()
         self.routers_properties = p_routers_properties
+        # Generation of the hosts parameters
+        for p_host_properties in p_hosts_properties:
+            p_host_properties['mgmtip'] = mgmtAllocator.nextMgmtAddress()
+        self.hosts_properties = p_hosts_properties
         # Assign mgmt ip to the mgmt station
         self.mgmtIP = mgmtAllocator.nextMgmtAddress()
         # Third step is the generation of the links parameters
+        # Generation of the core links parameters
         core_links_properties = []
         for core_link in self.core_links:
             core_links_properties.append(generator.getLinksProperties([core_link]))
@@ -98,6 +108,15 @@ class SRv6Topo(Topo):
             p_core_link_properties['iprhs'] = core_link_properties[0].iprhs
             p_core_link_properties['net'] = core_link_properties[0].net
         self.core_links_properties = p_core_links_properties
+        # Generation of the edge links parameters
+        edge_links_properties = []
+        for edge_link in self.edge_links:
+            edge_links_properties.append(generator.getLinksProperties([edge_link]))
+        for edge_link_properties, p_edge_link_properties in zip(edge_links_properties, p_edge_links_properties):
+            p_edge_link_properties['iplhs'] = edge_link_properties[0].iplhs
+            p_edge_link_properties['iprhs'] = edge_link_properties[0].iprhs
+            p_edge_link_properties['net'] = edge_link_properties[0].net
+        self.edge_links_properties = p_edge_links_properties
         # Init steps
         Topo.__init__( self, **opts )
 
@@ -107,7 +126,7 @@ class SRv6Topo(Topo):
         nodes_to_nets = defaultdict(list)
         # Init steps
         Topo.build( self, *args, **params )
-                # Add routers
+        # Add routers
         for router, router_properties in zip(self.routers, self.routers_properties):
             # Assign mgmtip, loobackip, routerid
             mgmtIP = router_properties['mgmtip']
@@ -123,6 +142,17 @@ class SRv6Topo(Topo):
             # Add node to the topology graph
             topology.add_node(router, mgmtip=mgmtip , loopbackip=loopbackip,
                 routerid=routerid, type="router")
+        # Add hosts
+        for host, host_properties in zip(self._hosts, self.hosts_properties):
+            # Assign mgmtip, loobackip, routerid
+            mgmtIP = host_properties['mgmtip']
+            mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+            # Add the host to the topology
+            self.addHost(name=host, cls=MHost, sshd=True, mgmtip=mgmtip, nets=[])
+            # Save mapping node to mgmt
+            nodes_to_mgmt[host] = str(mgmtIP)
+            # Add node to the topology graph
+            topology.add_node(host, mgmtip=mgmtip, type="host")
         # Create the mgmt switch
         br_mgmt = self.addSwitch(name='br-mgmt1', cls=OVSBridge)
         # Assign the mgmt ip to the mgmt station
@@ -140,6 +170,9 @@ class SRv6Topo(Topo):
         for router in self.routers:
             # Create a link between mgmt switch and the router
             self.addLink(router, br_mgmt, bw=1000, delay=0)
+        for host in self._hosts:
+            # Create a link between mgmt switch and the host
+            self.addLink(host, br_mgmt, bw=1000, delay=0)
         # Iterate over the core links and generate them
         for core_link, core_link_properties in zip(self.core_links, self.core_links_properties):
             # Get the left hand side of the pair
@@ -161,6 +194,36 @@ class SRv6Topo(Topo):
             lhsip = "%s/%d" % (core_link_properties['iplhs'], NetAllocator.prefix)
             # Get rhs ip
             rhsip = "%s/%d" % (core_link_properties['iprhs'], NetAllocator.prefix)
+            # Add edge to the topology
+            topology.add_edge(lhs, rhs, lhs_intf=lhsintf, rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
+            # Add the reverse edge to the topology
+            topology.add_edge(rhs, lhs, lhs_intf=rhsintf, rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
+            # Save net
+            lhsnet = {'intf':lhsintf, 'ip':lhsip, 'net':net}
+            rhsnet = {'intf':rhsintf, 'ip':rhsip, 'net':net}
+            self.nodeInfo(lhs)['nets'].append(lhsnet)
+            self.nodeInfo(rhs)['nets'].append(rhsnet)
+        # Iterate over the edge links and generate them
+        for edge_link, edge_link_properties in zip(self.edge_links, self.edge_links_properties):
+            # Get the left hand side of the pair
+            lhs = edge_link[0]
+            # Get the right hand side of the pair
+            rhs = edge_link[1]
+            # Create the edge link
+            self.addLink(lhs, rhs, bw=edge_link_properties['bw'],
+                delay=edge_link_properties['delay'])
+            # Get Port number
+            portNumber = self.port(lhs, rhs)
+            # Create lhs_intf
+            lhsintf = "%s-eth%d" % (lhs, portNumber[0])
+            # Create rhs_intf
+            rhsintf = "%s-eth%d" % (rhs, portNumber[1])
+            # Assign a data-plane net to this link
+            net = edge_link_properties['net']
+            # Get lhs ip
+            lhsip = "%s/%d" % (edge_link_properties['iplhs'], NetAllocator.prefix)
+            # Get rhs ip
+            rhsip = "%s/%d" % (edge_link_properties['iprhs'], NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf, rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
             # Add the reverse edge to the topology
