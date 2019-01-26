@@ -156,16 +156,25 @@ class MHost(Host):
   def config(self, **kwargs):
     # Init steps
     Host.config(self, **kwargs)
+    # Disable IPv6 address autoconfiguration
+    self.cmd('sysctl -w net.ipv6.conf.all.autoconf=0')
+    self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=0')
     # Iterate over the interfaces
     first = True
     for intf in self.intfs.itervalues():
+      # Disable IPv6 address autoconfiguration on the interface
+      # The addresses are configured by this script
+      self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=0" %intf.name)
+      # Accept Router Advertisements messages
+      # required to set a default via in the routing tables
+      self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" %intf.name)
       # Remove any configured address
-      #self.cmd('ifconfig %s 0' %intf.name)
+      self.cmd('ip a flush dev %s scope global' %intf.name)
       # For the first one, let's configure the mgmt address
       if first:
         first = False
         self.cmd('ip a a %s dev %s' %(kwargs['mgmtip'], intf.name))
-    #let's write the hostname in /var/mininet/hostname
+    # Let's write the hostname in /var/mininet/hostname
     self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
     # Retrieve nets
     if kwargs.get('nets', None):
@@ -176,18 +185,9 @@ class MHost(Host):
       self.cmd('/usr/sbin/sshd -D &')
     for net in self.nets:
       # Remove any configured address
-      #self.cmd('ifconfig %s 0' %net['intf'])
       self.cmd('ip a a %s dev %s' %(net['ip'], net['intf']))
     # Force Linux to keep all IPv6 addresses on an interface down event
     self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
-    # Disable IPv6 address autoconfiguration
-    self.cmd('sysctl -w net.ipv6.conf.all.autoconf=1')
-    self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
-    # Iterate over the interfaces
-    for intf in self.intfs.itervalues():
-      # Disable IPv6 address autoconfiguration on the interface
-      self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=1" %intf.name)
-      self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" %intf.name)
 
   # Clean up the environment
   def cleanup(self):
