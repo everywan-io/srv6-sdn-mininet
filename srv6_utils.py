@@ -84,6 +84,8 @@ class SRv6Router(Host):
     self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
     # Iterate over the interfaces
     for intf in self.intfs.itervalues():
+      # Force Linux to keep all IPv6 addresses on an interface down event
+      self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
       # Enable IPv6 forwarding
       self.cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" %intf.name)
       # Enable SRv6 on the interface
