@@ -199,8 +199,8 @@ class SRv6Topo(Topo):
             # Add the reverse edge to the topology
             topology.add_edge(rhs, lhs, lhs_intf=rhsintf, rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
             # Save net
-            lhsnet = {'intf':lhsintf, 'ip':lhsip, 'net':net}
-            rhsnet = {'intf':rhsintf, 'ip':rhsip, 'net':net}
+            lhsnet = {'intf':lhsintf, 'ip':lhsip, 'net':net, 'stub':False}
+            rhsnet = {'intf':rhsintf, 'ip':rhsip, 'net':net, 'stub':False}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
         # Iterate over the edge links and generate them
@@ -229,8 +229,10 @@ class SRv6Topo(Topo):
             # Add the reverse edge to the topology
             topology.add_edge(rhs, lhs, lhs_intf=rhsintf, rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
             # Save net
-            lhsnet = {'intf':lhsintf, 'ip':lhsip, 'net':net}
-            rhsnet = {'intf':rhsintf, 'ip':rhsip, 'net':net}
+            # Mark the nets as stub in order to set them
+            # as passive interfaces in the OSPF configuration
+            lhsnet = {'intf':lhsintf, 'ip':lhsip, 'net':net, 'stub':True}
+            rhsnet = {'intf':rhsintf, 'ip':rhsip, 'net':net, 'stub':True}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
 
