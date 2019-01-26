@@ -34,7 +34,6 @@ import json
 import sys
 
 # IPaddress dependencies
-from ipaddress import IPv6Network
 import ipaddress
 
 # Mininet dependencies
