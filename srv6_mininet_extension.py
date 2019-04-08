@@ -135,7 +135,7 @@ class SRv6Topo(Topo):
         # Generation of the mgmt links parameters
         mgmt_links_properties = []
         for mgmt_link in self.mgmt_links:
-            mgmt_links_properties.append(generator.getLinksProperties([mgmt_link]))
+            mgmt_links_properties.append(generator.getCoreLinksProperties([mgmt_link]))
         for mgmt_link_properties, p_mgmt_link_properties in zip(mgmt_links_properties, p_mgmt_links_properties):
             p_mgmt_link_properties['iplhs'] = mgmt_link_properties[0].iplhs
             p_mgmt_link_properties['iprhs'] = mgmt_link_properties[0].iprhs
@@ -302,9 +302,9 @@ class SRv6Topo(Topo):
             # Assign a data-plane net to this link
             net = mgmt_link_properties['net']
             # Get lhs ip
-            lhsip = "%s/%d" % (mgmt_link_properties['iplhs'], NetAllocator.prefix)
+            lhsip = "%s/%d" % (mgmt_link_properties['iplhs'], IPv6NetAllocator.prefix)
             # Get rhs ip
-            rhsip = "%s/%d" % (mgmt_link_properties['iprhs'], NetAllocator.prefix)
+            rhsip = "%s/%d" % (mgmt_link_properties['iprhs'], IPv6NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf, rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
             # Add the reverse edge to the topology

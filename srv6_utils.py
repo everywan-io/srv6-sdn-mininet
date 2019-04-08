@@ -36,14 +36,17 @@ import time
 #Path to the gRPC server
 CONTROL_PLANE_FOLDER = "/home/user/repos/srv6-sdn-control-plane/"
 DATA_PLANE_FOLDER = "/home/user/repos/srv6-sdn-data-plane/"
-TOPOLOGY_INFORMATION_DISCOVERY_PATH = CONTROL_PLANE_FOLDER + "topology/ti_extraction.py"
-INTERFACE_DISCOVERY_PATH = CONTROL_PLANE_FOLDER + "topology/interface_discovery.py"
+TOPOLOGY_INFORMATION_EXTRACTION_FOLDER = CONTROL_PLANE_FOLDER + "topology/"
+TOPOLOGY_INFORMATION_EXTRACTION_PATH = TOPOLOGY_INFORMATION_EXTRACTION_FOLDER + "ti_extraction.py"
+INTERFACE_DISCOVERY_FOLDER = CONTROL_PLANE_FOLDER + "interface_discovery/"
+INTERFACE_DISCOVERY_PATH = INTERFACE_DISCOVERY_FOLDER + "interface_discovery.py"
 NB_GRPC_SERVER_PATH = CONTROL_PLANE_FOLDER + "northbound/grpc/nb_grpc_server.py"
 SB_GRPC_SERVER_PATH = DATA_PLANE_FOLDER + "southbound/grpc/sb_grpc_server.py"
 
 from ipaddress import IPv6Interface
 
 IPv6_EMULATION = False
+TI_EXTRACTION_PERIOD = 3
 
 # Abstraction to model a SRv6Router
 class SRv6Router(Host):
@@ -163,7 +166,7 @@ class SRv6Router(Host):
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
       # Starting gRPC server
       if IPv6_EMULATION:
-        self.cmd("python %s & --ipv6" % SB_GRPC_SERVER_PATH)
+        self.cmd("python %s --ipv6 &" % SB_GRPC_SERVER_PATH)
       else:
         self.cmd("python %s &" % SB_GRPC_SERVER_PATH)
 
@@ -331,21 +334,21 @@ class SRv6Controller(Host):
       # In some systems this workaround solves the issue of ospf6d coming up before zebra
       time.sleep(.001)
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
-      time.sleep(4)
       # Starting gRPC northbound server
       ips = ""
+      ip_ports = ""
       if kwargs.get('neighbors', None):
         neighbors = kwargs['neighbors']
       for ip in neighbors:
-        ips += "%s-2606," % ip
+        ip_ports += "%s-2606," % ip
+        ips += "%s," % ip
+      ip_ports = ip_ports[:-1]
       ips = ips[:-1]
-      self.cmd("python %s --ip_ports %s --out_dir %s &" % (TOPOLOGY_INFORMATION_DISCOVERY_PATH, ips, self.dir))
-      time.sleep(6)
+      self.cmd("sleep 4 && python %s --ip_ports %s --out_dir %s --period %d &" % (TOPOLOGY_INFORMATION_EXTRACTION_PATH, ip_ports, TOPOLOGY_INFORMATION_EXTRACTION_FOLDER, TI_EXTRACTION_PERIOD))
       # Starting gRPC northbound server
-      self.cmd("python %s --out_dir %s &" % (INTERFACE_DISCOVERY_PATH, self.dir))
-      time.sleep(4)
+      self.cmd("sleep 10 && python %s --out_dir %s &" % (INTERFACE_DISCOVERY_PATH, INTERFACE_DISCOVERY_FOLDER))
       # Starting gRPC northbound server
-      self.cmd("python %s &" % NB_GRPC_SERVER_PATH)
+      self.cmd("sleep 14 && python %s &" % NB_GRPC_SERVER_PATH)
 
 
   # Clean up the environment
