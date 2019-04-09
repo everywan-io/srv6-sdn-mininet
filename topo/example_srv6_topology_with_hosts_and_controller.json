@@ -1,0 +1,221 @@
+{
+   "edges":[
+      {
+         "source":"ads1",
+         "target":"ads2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads1",
+         "target":"sur1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 5,
+              "delay": 200
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads2",
+         "target":"sur1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads1",
+         "target":"hads11",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads2",
+         "target":"hads21",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"sur1",
+         "target":"hsur11",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads1",
+         "target":"hads12",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads2",
+         "target":"hads22",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"sur1",
+         "target":"hsur12",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads1",
+         "target":"controller",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ads2",
+         "target":"controller",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100
+           },
+           "group": ""
+         }
+      }
+   ],
+   "vertices":[
+     {
+      "info": {
+        "type": "Router",
+        "property": {},
+        "group": [200]
+      },
+      "id": "ads1"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {},
+        "group": [200]
+      },
+      "id": "ads2"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {},
+        "group": [200]
+      },
+      "id": "sur1"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hads11"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hads12"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hads21"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hads22"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hsur11"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {},
+        "group": [200]
+      },
+      "id": "hsur12"
+     },
+     {
+      "info": {
+        "type": "Controller",
+        "property": {},
+        "group": [200]
+      },
+      "id": "controller"
+     }
+   ],
+   "graph_parameters":{
+        "testbed":"MININET"
+   }
+}
