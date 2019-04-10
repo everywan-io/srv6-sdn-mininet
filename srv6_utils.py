@@ -32,6 +32,7 @@ import re
 import os
 import shutil
 import time
+import sys
 
 #Path to the gRPC server
 CONTROL_PLANE_FOLDER = "/home/user/repos/srv6-sdn-control-plane/"
@@ -47,6 +48,9 @@ from ipaddress import IPv6Interface
 
 IPv6_EMULATION = False
 TI_EXTRACTION_PERIOD = 3
+
+# This workaround solves the issue of python commands executed outside the virtual environment
+PYTHON_PATH = sys.executable
 
 # Abstraction to model a SRv6Router
 class SRv6Router(Host):
@@ -166,9 +170,9 @@ class SRv6Router(Host):
       self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i %s/ospf6d.pid" %(self.dir, self.dir, self.dir))
       # Starting gRPC server
       if IPv6_EMULATION:
-        self.cmd("python %s --ipv6 &" % SB_GRPC_SERVER_PATH)
+        self.cmd("%s %s --ipv6 &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
       else:
-        self.cmd("python %s &" % SB_GRPC_SERVER_PATH)
+        self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
 
   # Clean up the environment
   def cleanup(self):
@@ -344,11 +348,11 @@ class SRv6Controller(Host):
         ips += "%s," % ip
       ip_ports = ip_ports[:-1]
       ips = ips[:-1]
-      self.cmd("sleep 4 && python %s --ip_ports %s --out_dir %s --period %d &" % (TOPOLOGY_INFORMATION_EXTRACTION_PATH, ip_ports, TOPOLOGY_INFORMATION_EXTRACTION_FOLDER, TI_EXTRACTION_PERIOD))
+      self.cmd("sleep 4 && %s %s --ip_ports %s --out_dir %s --period %d &" % (PYTHON_PATH, TOPOLOGY_INFORMATION_EXTRACTION_PATH, ip_ports, TOPOLOGY_INFORMATION_EXTRACTION_FOLDER, TI_EXTRACTION_PERIOD))
       # Starting gRPC northbound server
-      self.cmd("sleep 10 && python %s --out_dir %s &" % (INTERFACE_DISCOVERY_PATH, INTERFACE_DISCOVERY_FOLDER))
+      self.cmd("sleep 10 && %s %s --out_dir %s &" % (PYTHON_PATH, INTERFACE_DISCOVERY_PATH, INTERFACE_DISCOVERY_FOLDER))
       # Starting gRPC northbound server
-      self.cmd("sleep 14 && python %s &" % NB_GRPC_SERVER_PATH)
+      self.cmd("sleep 14 && %s %s &" % (PYTHON_PATH, NB_GRPC_SERVER_PATH))
 
 
   # Clean up the environment
