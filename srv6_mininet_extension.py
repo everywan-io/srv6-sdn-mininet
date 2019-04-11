@@ -88,10 +88,7 @@ class SRv6Topo(Topo):
         self.mgmt_links = parser.getMgmtLinks()
         p_mgmt_links_properties = parser.getMgmtLinksProperties()
         # Properties generator
-        if srv6_utils.IPv6_EMULATION:
-            generator = IPv6PropertiesGenerator()
-        else:
-            generator = IPv4PropertiesGenerator()
+        generator = PropertiesGenerator()
         mgmtAllocator = MgmtAllocator()
         # Second step is the generation of the nodes parameters
         # Generation of the routers parameters
@@ -117,7 +114,7 @@ class SRv6Topo(Topo):
         # Generation of the core links parameters
         core_links_properties = []
         for core_link in self.core_links:
-            core_links_properties.append(generator.getCoreLinksProperties([core_link]))
+            core_links_properties.append(generator.getIPv6LinksProperties([core_link]))
         for core_link_properties, p_core_link_properties in zip(core_links_properties, p_core_links_properties):
             p_core_link_properties['iplhs'] = core_link_properties[0].iplhs
             p_core_link_properties['iprhs'] = core_link_properties[0].iprhs
@@ -126,7 +123,10 @@ class SRv6Topo(Topo):
         # Generation of the edge links parameters
         edge_links_properties = []
         for edge_link in self.edge_links:
-            edge_links_properties.append(generator.getEdgeLinksProperties([edge_link]))
+            if srv6_utils.IPv6_EMULATION:
+                edge_links_properties.append(generator.getIPv6LinksProperties([edge_link]))
+            else:
+                edge_links_properties.append(generator.getIPv4LinksProperties([edge_link]))                
         for edge_link_properties, p_edge_link_properties in zip(edge_links_properties, p_edge_links_properties):
             p_edge_link_properties['iplhs'] = edge_link_properties[0].iplhs
             p_edge_link_properties['iprhs'] = edge_link_properties[0].iprhs
@@ -135,7 +135,7 @@ class SRv6Topo(Topo):
         # Generation of the mgmt links parameters
         mgmt_links_properties = []
         for mgmt_link in self.mgmt_links:
-            mgmt_links_properties.append(generator.getCoreLinksProperties([mgmt_link]))
+            mgmt_links_properties.append(generator.getIPv6LinksProperties([mgmt_link]))
         for mgmt_link_properties, p_mgmt_link_properties in zip(mgmt_links_properties, p_mgmt_links_properties):
             p_mgmt_link_properties['iplhs'] = mgmt_link_properties[0].iplhs
             p_mgmt_link_properties['iprhs'] = mgmt_link_properties[0].iprhs
