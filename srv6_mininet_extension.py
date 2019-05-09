@@ -263,16 +263,24 @@ class SRv6Topo(Topo):
             rhsintf = "%s-eth%d" % (rhs, portNumber[1])
             # Assign a data-plane net to this link
             net = edge_link_properties['net']
-            # Get lhs ip
+            # Get ips
             if srv6_utils.IPv6_EMULATION:
+                # Get lhs ip
                 lhsip = "%s/%d" % (edge_link_properties['iplhs'], IPv6NetAllocator.prefix)
-            else:
-                lhsip = "%s/%d" % (edge_link_properties['iplhs'], IPv4NetAllocator.prefix)
-            # Get rhs ip
-            if srv6_utils.IPv6_EMULATION:
+                # Get rhs ip
                 rhsip = "%s/%d" % (edge_link_properties['iprhs'], IPv6NetAllocator.prefix)
             else:
+                # Get lhs ip
+                lhsip = "%s/%d" % (edge_link_properties['iplhs'], IPv4NetAllocator.prefix)
+                # Get rhs ip
                 rhsip = "%s/%d" % (edge_link_properties['iprhs'], IPv4NetAllocator.prefix)
+                # Get default via
+                if lhs in self._hosts:
+                    defaultvia = "%s" % (edge_link_properties['iprhs'])
+                    self.nodeInfo(lhs)['defaultvia'] = {'ip':defaultvia, 'intf':lhsintf}
+                else:
+                    defaultvia = "%s" % (edge_link_properties['iplhs'])
+                    self.nodeInfo(rhs)['defaultvia'] = {'ip':defaultvia, 'intf':rhsintf}
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf, rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
             # Add the reverse edge to the topology

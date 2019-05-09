@@ -228,6 +228,10 @@ class MHost(Host):
     for net in self.nets:
       # Set the address
       self.cmd('ip a a %s dev %s' %(net['ip'], net['intf']))
+    if kwargs.get('defaultvia', None):
+      # Set the default via
+      defaultvia = kwargs['defaultvia']
+      self.cmd('ip r a default via %s dev %s' %(defaultvia['ip'], defaultvia['intf']))
     if IPv6_EMULATION:
       # Force Linux to keep all IPv6 addresses on an interface down event
       self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
