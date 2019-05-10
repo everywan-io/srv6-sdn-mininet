@@ -91,6 +91,10 @@ class SRv6Router(Host):
       self.nets.append({'intf':'lo', 'ip':kwargs['loopbackip'], 'net':kwargs['loopbackip']})
     # Enable IPv6 forwarding
     self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
+    # Enable IPv4 forwarding
+    self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
+    # Disable rp filter
+    self.cmd("sysctl -w net.ipv4.conf.all.rp_filter=0")
     # Enable SRv6 on the interface
     self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
     # Disable RA accept
@@ -105,6 +109,10 @@ class SRv6Router(Host):
       self.cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" %intf.name)
       # Enable SRv6 on the interface
       self.cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" %intf.name)
+      # Enable IPv4 forwarding
+      self.cmd("sysctl -w net.ipv4.conf.%s.forwarding=1" %intf.name)
+      # Disable rp filter
+      self.cmd("sysctl -w net.ipv4.conf.%s.rp_filter=0" %intf.name)
     # Zebra and Quagga config
     if len(self.nets) > 0:
       zebra = open("%s/zebra.conf" % self.dir, 'w')
