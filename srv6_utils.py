@@ -46,7 +46,7 @@ NB_GRPC_SERVER_PATH = \
     CONTROL_PLANE_FOLDER + "northbound/grpc/nb_grpc_server.py"
 SB_GRPC_SERVER_PATH = DATA_PLANE_FOLDER + "southbound/grpc/sb_grpc_server.py"
 
-TI_EXTRACTION_PERIOD = 3
+TI_EXTRACTION_PERIOD = 10
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
@@ -416,14 +416,10 @@ class SRv6Controller(Host):
             ip_ports = ip_ports[:-1]
             ips = ips[:-1]
             self.cmd("sleep 4 && %s %s --ip_ports %s "
-                     "--out_dir %s --period %d &"
+                     "--out_dir %s --period %d -i &"
                      % (PYTHON_PATH, TOPOLOGY_INFORMATION_EXTRACTION_PATH,
                         ip_ports, TOPOLOGY_INFORMATION_EXTRACTION_FOLDER,
                         TI_EXTRACTION_PERIOD))
-            # Starting gRPC northbound server
-            self.cmd("sleep 10 && %s %s --out_dir %s &"
-                     % (PYTHON_PATH, INTERFACE_DISCOVERY_PATH,
-                        INTERFACE_DISCOVERY_FOLDER))
             # Starting gRPC northbound server
             self.cmd("sleep 14 && %s %s &"
                      % (PYTHON_PATH, NB_GRPC_SERVER_PATH))
