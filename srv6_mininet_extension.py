@@ -209,7 +209,7 @@ class SRv6Topo(Topo):
             mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
             # Add the host to the topology
             self.addHost(name=controller, cls=SRv6Controller,
-                         routerid=routerid, sshd=False, mgmtip=mgmtip,
+                         routerid=routerid, sshd=True, mgmtip=mgmtip,
                          nets=[], neighbors=[])
             # Save mapping node to mgmt
             nodes_to_mgmt[controller] = str(mgmtIP)
