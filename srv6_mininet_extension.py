@@ -30,9 +30,6 @@ from optparse import OptionParser
 import os
 import json
 
-# IPaddress dependencies
-import ipaddress
-
 # Mininet dependencies
 from mininet.log import setLogLevel
 from mininet.net import Mininet
@@ -50,9 +47,8 @@ from srv6_topo_parser import SRv6TopoParser
 from srv6_utils import SRv6Router, MHost, SRv6Controller
 from srv6_generators import (PropertiesGenerator,
                              LoopbackAllocator,
-                             IPv6NetAllocator,
-                             IPv4NetAllocator)
-from srv6_net_utils import MgmtAllocator
+                             NetAllocator,
+                             MgmtAllocator)
 
 # nodes.sh file for setup of the nodes
 NODES_SH = "/tmp/nodes.sh"
@@ -89,7 +85,6 @@ class SRv6Topo(Topo):
         p_mgmt_links_properties = parser.getMgmtLinksProperties()
         # Properties generator
         generator = PropertiesGenerator()
-        mgmtAllocator = MgmtAllocator()
         # Second step is the generation of the nodes parameters
         # Generation of the routers parameters
         routers_properties = generator.getRoutersProperties(self.routers)
@@ -98,30 +93,35 @@ class SRv6Topo(Topo):
                                          p_routers_properties):
             p_router_properties['loopback'] = router_properties.loopback
             p_router_properties['routerid'] = router_properties.routerid
-            p_router_properties['mgmtip'] = mgmtAllocator.nextMgmtAddress()
+            p_router_properties['routernet'] = router_properties.routernet
+            p_router_properties['mgmtip'] = router_properties.mgmtip
         self.routers_properties = p_routers_properties
         # Generation of the hosts parameters
-        for p_host_properties in p_hosts_properties:
-            p_host_properties['mgmtip'] = mgmtAllocator.nextMgmtAddress()
+        hosts_properties = generator.getHostsProperties(self._hosts)
+        for (host_properties,
+             p_host_properties) in zip(hosts_properties,
+                                       p_hosts_properties):
+            p_host_properties['mgmtip'] = host_properties.mgmtip
         self.hosts_properties = p_hosts_properties
         # Generation of the controllers parameters
         controllers_properties = (generator
-                                  .getRoutersProperties(self.controllers))
+                                  .getControllersProperties(self.controllers))
         for (controller_properties,
              p_controller_properties) in zip(controllers_properties,
                                              p_controllers_properties):
             p_controller_properties['routerid'] = (controller_properties
                                                    .routerid)
-            p_controller_properties['mgmtip'] = mgmtAllocator.nextMgmtAddress()
+            p_controller_properties['mgmtip'] = controller_properties.mgmtip
         self.controllers_properties = p_controllers_properties
         # Assign mgmt ip to the mgmt station
-        self.mgmtIP = mgmtAllocator.nextMgmtAddress()
+        self.mgmtIP = generator.nextMgmtAddress()
         # Third step is the generation of the links parameters
         # Generation of the core links parameters
         core_links_properties = []
         for core_link in self.core_links:
+            core_link = (core_link[0], core_link[1])
             core_links_properties.append(generator
-                                         .getIPv6LinksProperties([core_link]))
+                                         .getCoreLinksProperties([core_link]))
         for (core_link_properties,
              p_core_link_properties) in zip(core_links_properties,
                                             p_core_links_properties):
@@ -134,12 +134,9 @@ class SRv6Topo(Topo):
         for (edge_link,
              p_edge_link_properties) in zip(self.edge_links,
                                             p_edge_links_properties):
-            if p_edge_link_properties.get('use-ipv6-addressing', False):
-                (edge_links_properties
-                 .append(generator.getIPv6LinksProperties([edge_link])))
-            else:
-                (edge_links_properties
-                 .append(generator.getIPv4LinksProperties([edge_link])))
+            edge_link = (edge_link[0], edge_link[1])
+            edge_links_properties.append(generator
+                                         .getEdgeLinksProperties([edge_link]))
         for (edge_link_properties,
              p_edge_link_properties) in zip(edge_links_properties,
                                             p_edge_links_properties):
@@ -150,8 +147,9 @@ class SRv6Topo(Topo):
         # Generation of the mgmt links parameters
         mgmt_links_properties = []
         for mgmt_link in self.mgmt_links:
-            (mgmt_links_properties
-             .append(generator.getIPv6LinksProperties([mgmt_link])))
+            mgmt_link = (mgmt_link[0], mgmt_link[1])
+            mgmt_links_properties.append(generator
+                                         .getMgmtLinksProperties([mgmt_link]))
         for (mgmt_link_properties,
              p_mgmt_link_properties) in zip(mgmt_links_properties,
                                             p_mgmt_links_properties):
@@ -173,11 +171,12 @@ class SRv6Topo(Topo):
             mgmtIP = router_properties['mgmtip']
             loopbackIP = router_properties['loopback']
             routerid = router_properties['routerid']
+            routernet = router_properties['routernet']
             loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
             mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
             # Add the router to the topology
             self.addHost(name=router, cls=SRv6Router, sshd=True, mgmtip=mgmtip,
-                         loopbackip=loopbackip, routerid=routerid, nets=[])
+                         loopbackip=loopbackip, routerid=routerid, routernet=routernet, nets=[])
             # Save mapping node to mgmt
             nodes_to_mgmt[router] = str(mgmtIP)
             # Save mapping node to loopbackip
@@ -216,8 +215,6 @@ class SRv6Topo(Topo):
             # Add node to the topology graph
             topology.add_node(controller, routerid=routerid,
                               mgmtip=mgmtip, type="controller")
-            # Create a link between mgmt switch and mgmt station
-            self.addLink(controller, br_mgmt, bw=1000, delay=0)
         # Assign the mgmt ip to the mgmt station
         mgmtIP = self.mgmtIP
         mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
@@ -237,7 +234,7 @@ class SRv6Topo(Topo):
             # Create a link between mgmt switch and the host
             self.addLink(host, br_mgmt, bw=1000, delay=0)
         for controller in self.controllers:
-            # Create a link between mgmt switch and the host
+            # Create a link between mgmt switch and the controller
             self.addLink(controller, br_mgmt, bw=1000, delay=0)
         # Iterate over the core links and generate them
         for core_link, core_link_properties in zip(self.core_links,
@@ -259,10 +256,10 @@ class SRv6Topo(Topo):
             net = core_link_properties['net']
             # Get lhs ip
             lhsip = "%s/%d" % (core_link_properties['iplhs'],
-                               IPv6NetAllocator.prefix)
+                               NetAllocator.prefix)
             # Get rhs ip
             rhsip = "%s/%d" % (core_link_properties['iprhs'],
-                               IPv6NetAllocator.prefix)
+                               NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -277,9 +274,6 @@ class SRv6Topo(Topo):
         # Iterate over the edge links and generate them
         for edge_link, edge_link_properties in zip(self.edge_links,
                                                    self.edge_links_properties):
-            # Check if the link uses IPv6 addresses
-            useIPv6Addressing = (edge_link_properties
-                                 .get('use-ipv6-addressing', False))
             # Get the left hand side of the pair
             lhs = edge_link[0]
             # Get the right hand side of the pair
@@ -295,30 +289,12 @@ class SRv6Topo(Topo):
             rhsintf = "%s-eth%d" % (rhs, portNumber[1])
             # Assign a data-plane net to this link
             net = edge_link_properties['net']
-            # Get ips
-            if useIPv6Addressing:
-                # Get lhs ip
-                lhsip = "%s/%d" % (edge_link_properties['iplhs'],
-                                   IPv6NetAllocator.prefix)
-                # Get rhs ip
-                rhsip = "%s/%d" % (edge_link_properties['iprhs'],
-                                   IPv6NetAllocator.prefix)
-            else:
-                # Get lhs ip
-                lhsip = "%s/%d" % (edge_link_properties['iplhs'],
-                                   IPv4NetAllocator.prefix)
-                # Get rhs ip
-                rhsip = "%s/%d" % (edge_link_properties['iprhs'],
-                                   IPv4NetAllocator.prefix)
-                # Get default via
-                if lhs in self._hosts:
-                    defaultvia = "%s" % (edge_link_properties['iprhs'])
-                    self.nodeInfo(lhs)['defaultvia'] = {'ip': defaultvia,
-                                                        'intf': lhsintf}
-                else:
-                    defaultvia = "%s" % (edge_link_properties['iplhs'])
-                    self.nodeInfo(rhs)['defaultvia'] = {'ip': defaultvia,
-                                                        'intf': rhsintf}
+            # Get lhs ip
+            lhsip = "%s/%d" % (edge_link_properties['iplhs'],
+                               NetAllocator.prefix)
+            # Get rhs ip
+            rhsip = "%s/%d" % (edge_link_properties['iprhs'],
+                               NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -328,10 +304,8 @@ class SRv6Topo(Topo):
             # Save net
             # Mark the nets as stub in order to set them
             # as passive interfaces in the OSPF configuration
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net,
-                      'stub': True, 'useIPv6Addressing': useIPv6Addressing}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net,
-                      'stub': True, 'useIPv6Addressing': useIPv6Addressing}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'stub': True}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'stub': True}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
         # Iterate over the mgmt links and generate them
@@ -354,10 +328,10 @@ class SRv6Topo(Topo):
             net = mgmt_link_properties['net']
             # Get lhs ip
             lhsip = "%s/%d" % (mgmt_link_properties['iplhs'],
-                               IPv6NetAllocator.prefix)
+                               NetAllocator.prefix)
             # Get rhs ip
             rhsip = "%s/%d" % (mgmt_link_properties['iprhs'],
-                               IPv6NetAllocator.prefix)
+                               NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -394,8 +368,8 @@ def dump():
                 'target': link['target'],
                 'lhs_intf': link['lhs_intf'],
                 'rhs_intf': link['rhs_intf'],
-                'lhs_ip': str((ipaddress.ip_interface(link['lhs_ip'])).ip),
-                'rhs_ip': str((ipaddress.ip_interface(link['rhs_ip'])).ip)
+                'lhs_ip': link['lhs_ip'],
+                'rhs_ip': link['rhs_ip']
             }
             for link in json_topology['links']]
         # Dump the topology
@@ -468,7 +442,7 @@ def parseOptions():
     # IP of RYU controller
     parser.add_option('--controller', dest='controller',
                       type='string', default="127.0.0.1",
-                      help='IP address of the Controlle instance')
+                      help='IP address of the Controller instance')
     # Topology json file
     parser.add_option('--topology', dest='topology', type='string',
                       default="example_srv6_topology.json",

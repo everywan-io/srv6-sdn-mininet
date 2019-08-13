@@ -33,20 +33,9 @@ import shutil
 import time
 import sys
 
-# Path to the gRPC server
-CONTROL_PLANE_FOLDER = "/home/user/repos/srv6-sdn-control-plane/"
-DATA_PLANE_FOLDER = "/home/user/repos/srv6-sdn-data-plane/"
-TOPOLOGY_INFORMATION_EXTRACTION_FOLDER = CONTROL_PLANE_FOLDER + "topology/"
-TOPOLOGY_INFORMATION_EXTRACTION_PATH = \
-    TOPOLOGY_INFORMATION_EXTRACTION_FOLDER + "ti_extraction.py"
-INTERFACE_DISCOVERY_FOLDER = CONTROL_PLANE_FOLDER + "interface_discovery/"
-INTERFACE_DISCOVERY_PATH = \
-    INTERFACE_DISCOVERY_FOLDER + "interface_discovery.py"
-NB_GRPC_SERVER_PATH = \
-    CONTROL_PLANE_FOLDER + "northbound/grpc/nb_grpc_server.py"
-SB_GRPC_SERVER_PATH = DATA_PLANE_FOLDER + "southbound/grpc/sb_grpc_server.py"
-
-TI_EXTRACTION_PERIOD = 10
+# Path to the southbound gRPC-based server
+DATA_PLANE_FOLDER = '../srv6-sdn-data-plane'
+SB_GRPC_SERVER_PATH = '%s/southbound/grpc/sb_grpc_server.py' % DATA_PLANE_FOLDER
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
@@ -130,9 +119,13 @@ class SRv6Router(Host):
                         self.name)
             zebra.write("password srv6\nenable password srv6\n"
                         "log file %s/zebra.log\n!\n" % self.dir)
+            # Add static route for router network
+            if kwargs.get('routernet', None):
+                routernet = kwargs['routernet']
+                zebra.write("ipv6 route %s lo\n!\n" % routernet)
             # Iterate over the nets and build interface part of the configs
             for net in self.nets:
-                cost = 1
+                cost = 1698
                 ra_interval = 10
                 # To mitigate annoying warnings
                 if net['intf'] == 'lo':
@@ -149,27 +142,16 @@ class SRv6Router(Host):
                                     "ipv6 ospf6 retransmit-interval 3\n!\n"
                                     % (net['intf'], cost, 1))
                         if net.get('mgmt', False) is False:
-                            if net.get('useIPv6Addressing', False):
-                                # In the IPv4 emulation
-                                # stub networks use IPv6 addresses
-                                # Set the IPv6 address
-                                # and the network discovery prefix
-                                # in the zebra configuration
-                                zebra.write("interface %s\nlink-detect\n"
-                                            "no ipv6 nd suppress-ra\n"
-                                            "ipv6 nd ra-interval %s\n"
-                                            "ipv6 address %s\n"
-                                            "ipv6 nd prefix %s\n!\n"
-                                            % (net['intf'], ra_interval,
-                                               net['ip'], net['net']))
-                            else:
-                                # In the IPv4 emulation
-                                # stub networks use IPv4 addresses
-                                # Set the IPv4 address
-                                # in the zebra configuration
-                                zebra.write("interface %s\nlink-detect\n"
-                                            "ip address %s\n!\n"
-                                            % (net['intf'], net['ip']))
+                            # Set the IPv6 address
+                            # and the network discovery prefix
+                            # in the zebra configuration
+                            zebra.write("interface %s\nlink-detect\n"
+                                        "no ipv6 nd suppress-ra\n"
+                                        "ipv6 nd ra-interval %s\n"
+                                        "ipv6 address %s\n"
+                                        "ipv6 nd prefix %s\n!\n"
+                                        % (net['intf'], ra_interval,
+                                           net['ip'], net['net']))
                     else:
                         # Transit network
                         ospfd.write("interface %s\nipv6 ospf6 cost %s\n"
@@ -189,6 +171,18 @@ class SRv6Router(Host):
                                         "ipv6 nd prefix %s\n!\n"
                                         % (net['intf'], ra_interval,
                                            net['ip'], net['net']))
+                        else:
+                            # Both in IPv4 and IPv6 emulation
+                            # transit networks use IPv6 addresses
+                            # Set the IPv6 address and the network
+                            # discovery prefix in the zebra configuration
+                            zebra.write("interface %s\nlink-detect\n"
+                                        "no ipv6 nd suppress-ra\n"
+                                        "ipv6 nd ra-interval %s\n"
+                                        "ipv6 address %s\n"
+                                        "ipv6 nd prefix %s\n!\n"
+                                        % (net['intf'], ra_interval,
+                                           net['ip'], net['net']))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -197,6 +191,7 @@ class SRv6Router(Host):
             ospfd.write("area 0.0.0.0 range %s\n" % RANGE_FOR_AREA_0)
             # Iterate again over the nets to finish area part
             for net in self.nets:
+                #if net.get('mgmt', False) is True:
                 ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
             ospfd.close()
@@ -213,7 +208,7 @@ class SRv6Router(Host):
             # In some systems this workaround solves the issue
             # of ospf6d coming up before zebra
             time.sleep(.001)
-            self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
+            self.cmdPrint("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
             # Starting gRPC server
             self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
@@ -273,11 +268,6 @@ class MHost(Host):
         for net in self.nets:
             # Set the address
             self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
-        if kwargs.get('defaultvia', None):
-            # Set the default via
-            defaultvia = kwargs['defaultvia']
-            self.cmd('ip r a default via %s dev %s' %
-                     (defaultvia['ip'], defaultvia['intf']))
         # Force Linux to keep all IPv6 addresses on an interface down event
         self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
 
@@ -334,7 +324,7 @@ class SRv6Controller(Host):
         # Enable SRv6 on the interface
         self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
         # Disable RA accept
-        self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
+        self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=1")
         # Force Linux to keep all IPv6 addresses on an interface down event
         self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
         # Iterate over the interfaces
@@ -378,6 +368,16 @@ class SRv6Controller(Host):
                                     "ipv6 ospf6 dead-interval 3\n"
                                     "ipv6 ospf6 retransmit-interval 3\n!\n"
                                     % (net['intf'], cost, 1))
+                        if net.get('mgmt', False) is True:
+                            # Both in IPv4 and IPv6 emulation
+                            # transit networks use IPv6 addresses
+                            # Set the IPv6 address and the network
+                            # discovery prefix in the zebra configuration
+                            zebra.write("interface %s\nlink-detect\n"
+                                        "ipv6 address %s\n"
+                                        "ipv6 nd prefix %s\n!\n"
+                                        % (net['intf'],
+                                           net['ip'], net['net']))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -405,24 +405,6 @@ class SRv6Controller(Host):
             time.sleep(.001)
             self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
-            # Starting gRPC northbound server
-            ips = ""
-            ip_ports = ""
-            if kwargs.get('neighbors', None):
-                neighbors = kwargs['neighbors']
-            for ip in neighbors:
-                ip_ports += "%s-2606," % ip
-                ips += "%s," % ip
-            ip_ports = ip_ports[:-1]
-            ips = ips[:-1]
-            self.cmd("sleep 4 && %s %s --ip_ports %s "
-                     "--out_dir %s --period %d -i &"
-                     % (PYTHON_PATH, TOPOLOGY_INFORMATION_EXTRACTION_PATH,
-                        ip_ports, TOPOLOGY_INFORMATION_EXTRACTION_FOLDER,
-                        TI_EXTRACTION_PERIOD))
-            # Starting gRPC northbound server
-            self.cmd("sleep 14 && %s %s &"
-                     % (PYTHON_PATH, NB_GRPC_SERVER_PATH))
 
     # Clean up the environment
     def cleanup(self):
