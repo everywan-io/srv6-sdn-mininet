@@ -404,7 +404,6 @@ def stopAll():
 # Utility function to deploy Mininet topology
 def deploy(options):
     # Retrieves options
-    controller = options.controller
     topologyFile = options.topology
     clean_all = options.clean_all
     no_cli = options.no_cli
@@ -418,8 +417,6 @@ def deploy(options):
     topo = SRv6Topo(topo=topologyFile)
     # Create Mininet net
     net = Mininet(topo=topo, link=TCLink, build=False, controller=None)
-    # Add manually external controller
-    net.addController("c0", controller=RemoteController, ip=controller)
     # Build topology
     net.build()
     # Start topology
@@ -439,10 +436,6 @@ def deploy(options):
 # Parse command line options and dump results
 def parseOptions():
     parser = OptionParser()
-    # IP of RYU controller
-    parser.add_option('--controller', dest='controller',
-                      type='string', default="127.0.0.1",
-                      help='IP address of the Controller instance')
     # Topology json file
     parser.add_option('--topology', dest='topology', type='string',
                       default="example_srv6_topology.json",
