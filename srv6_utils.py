@@ -27,6 +27,8 @@ from srv6_generators import RANGE_FOR_AREA_0
 
 # Mininet
 from mininet.node import Host
+from mininet.log import error
+
 # General imports
 import os
 import shutil
@@ -36,6 +38,14 @@ import sys
 # Path to the southbound gRPC-based server
 DATA_PLANE_FOLDER = '../srv6-sdn-data-plane'
 SB_GRPC_SERVER_PATH = '%s/southbound/grpc/sb_grpc_server.py' % DATA_PLANE_FOLDER
+
+if DATA_PLANE_FOLDER == '':
+    print 'Error: Set DATA_PLANE_FOLDER variable in srv6_utils.py'
+    sys.exist(-2)
+
+if not os.path.exists(DATA_PLANE_FOLDER):
+    error('Error: DATA_PLANE_FOLDER variable in srv6_utils.py points to a non existing folder\n')
+    sys.exist(-2)
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
