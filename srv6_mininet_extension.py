@@ -25,11 +25,11 @@
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 # @author Alessandro Masci <mascialessandro89@gmail.com>
 
-from optparse import OptionParser
 
+# General imports
+from optparse import OptionParser
 import os
 import json
-
 # Mininet dependencies
 from mininet.log import setLogLevel
 from mininet.net import Mininet
@@ -37,18 +37,16 @@ from mininet.topo import Topo
 from mininet.node import RemoteController, OVSBridge
 from mininet.link import TCLink
 from mininet.cli import CLI
-
 # NetworkX dependencies
 import networkx as nx
 from networkx.readwrite import json_graph
-
 # SRv6 dependencies
 from srv6_topo_parser import SRv6TopoParser
-from srv6_utils import SRv6Router, MHost, SRv6Controller
-from srv6_generators import (PropertiesGenerator,
-                             LoopbackAllocator,
-                             NetAllocator,
-                             MgmtAllocator)
+from srv6_utils import SRv6Router, MHost
+from srv6_generators import PropertiesGenerator
+from srv6_generators import LoopbackAllocator
+from srv6_generators import NetAllocator
+from srv6_generators import MgmtAllocator
 
 # nodes.sh file for setup of the nodes
 NODES_SH = "/tmp/nodes.sh"
@@ -75,14 +73,10 @@ class SRv6Topo(Topo):
         p_routers_properties = parser.getRoutersProperties()
         self._hosts = parser.getHosts()
         p_hosts_properties = parser.getHostsProperties()
-        self.controllers = parser.getControllers()
-        p_controllers_properties = parser.getControllersProperties()
         self.core_links = parser.getCoreLinks()
         p_core_links_properties = parser.getCoreLinksProperties()
         self.edge_links = parser.getEdgeLinks()
         p_edge_links_properties = parser.getEdgeLinksProperties()
-        self.mgmt_links = parser.getMgmtLinks()
-        p_mgmt_links_properties = parser.getMgmtLinksProperties()
         # Properties generator
         generator = PropertiesGenerator()
         # Second step is the generation of the nodes parameters
@@ -103,16 +97,6 @@ class SRv6Topo(Topo):
                                        p_hosts_properties):
             p_host_properties['mgmtip'] = host_properties.mgmtip
         self.hosts_properties = p_hosts_properties
-        # Generation of the controllers parameters
-        controllers_properties = (generator
-                                  .getControllersProperties(self.controllers))
-        for (controller_properties,
-             p_controller_properties) in zip(controllers_properties,
-                                             p_controllers_properties):
-            p_controller_properties['routerid'] = (controller_properties
-                                                   .routerid)
-            p_controller_properties['mgmtip'] = controller_properties.mgmtip
-        self.controllers_properties = p_controllers_properties
         # Assign mgmt ip to the mgmt station
         self.mgmtIP = generator.nextMgmtAddress()
         # Third step is the generation of the links parameters
@@ -144,19 +128,6 @@ class SRv6Topo(Topo):
             p_edge_link_properties['iprhs'] = edge_link_properties[0].iprhs
             p_edge_link_properties['net'] = edge_link_properties[0].net
         self.edge_links_properties = p_edge_links_properties
-        # Generation of the mgmt links parameters
-        mgmt_links_properties = []
-        for mgmt_link in self.mgmt_links:
-            mgmt_link = (mgmt_link[0], mgmt_link[1])
-            mgmt_links_properties.append(generator
-                                         .getMgmtLinksProperties([mgmt_link]))
-        for (mgmt_link_properties,
-             p_mgmt_link_properties) in zip(mgmt_links_properties,
-                                            p_mgmt_links_properties):
-            p_mgmt_link_properties['iplhs'] = mgmt_link_properties[0].iplhs
-            p_mgmt_link_properties['iprhs'] = mgmt_link_properties[0].iprhs
-            p_mgmt_link_properties['net'] = mgmt_link_properties[0].net
-        self.mgmt_links_properties = p_mgmt_links_properties
         # Init steps
         Topo.__init__(self, **opts)
 
@@ -198,26 +169,10 @@ class SRv6Topo(Topo):
             topology.add_node(host, mgmtip=mgmtip, type="host")
         # Create the mgmt switch
         br_mgmt = self.addSwitch(name='br-mgmt1', cls=OVSBridge)
-        # Add controllers
-        for (controller,
-             controller_properties) in zip(self.controllers,
-                                           self.controllers_properties):
-            # Assign mgmtip, loobackip, routerid
-            mgmtIP = controller_properties['mgmtip']
-            routerid = controller_properties['routerid']
-            mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
-            # Add the host to the topology
-            self.addHost(name=controller, cls=SRv6Controller,
-                         routerid=routerid, sshd=True, mgmtip=mgmtip,
-                         nets=[], neighbors=[])
-            # Save mapping node to mgmt
-            nodes_to_mgmt[controller] = str(mgmtIP)
-            # Add node to the topology graph
-            topology.add_node(controller, routerid=routerid,
-                              mgmtip=mgmtip, type="controller")
         # Assign the mgmt ip to the mgmt station
         mgmtIP = self.mgmtIP
         mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+        print(mgmtip)
         # Mgmt name
         mgmt = 'mgmt'
         # Create the mgmt node in the root namespace
@@ -226,16 +181,31 @@ class SRv6Topo(Topo):
         nodes_to_mgmt[mgmt] = str(mgmtIP)
         # Create a link between mgmt switch and mgmt station
         self.addLink(mgmt, br_mgmt, bw=1000, delay=0)
+        # Get Port number
+        portNumber = self.port(mgmt, br_mgmt)
+        # Get management interface
+        mgmtintf = "%s-eth%d" % (mgmt, portNumber[0])
+        # Add management interface to the node info
+        self.nodeInfo(mgmt)['mgmtintf'] = mgmtintf
         # Connect all the routers to the management network
         for router in self.routers:
             # Create a link between mgmt switch and the router
             self.addLink(router, br_mgmt, bw=1000, delay=0)
+            # Get Port number
+            portNumber = self.port(router, br_mgmt)
+            # Get management interface
+            mgmtintf = "%s-eth%d" % (router, portNumber[0])
+            # Add management interface to the node info
+            self.nodeInfo(router)['mgmtintf'] = mgmtintf
         for host in self._hosts:
             # Create a link between mgmt switch and the host
             self.addLink(host, br_mgmt, bw=1000, delay=0)
-        for controller in self.controllers:
-            # Create a link between mgmt switch and the controller
-            self.addLink(controller, br_mgmt, bw=1000, delay=0)
+            # Get Port number
+            portNumber = self.port(host, br_mgmt)
+            # Get management interface
+            mgmtintf = "%s-eth%d" % (host, portNumber[0])
+            # Add management interface to the node info
+            self.nodeInfo(host)['mgmtintf'] = mgmtintf
         # Iterate over the core links and generate them
         for core_link, core_link_properties in zip(self.core_links,
                                                    self.core_links_properties):
@@ -266,9 +236,11 @@ class SRv6Topo(Topo):
             # Add the reverse edge to the topology
             topology.add_edge(rhs, lhs, lhs_intf=rhsintf,
                               rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
+            # Configure the cost of the nets
+            cost = core_link_properties.get('cost')
             # Save net
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'stub': False}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'stub': False}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': False}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': False}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
         # Iterate over the edge links and generate them
@@ -301,58 +273,15 @@ class SRv6Topo(Topo):
             # Add the reverse edge to the topology
             topology.add_edge(rhs, lhs, lhs_intf=rhsintf,
                               rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
+            # Configure the cost of the nets
+            cost = edge_link_properties.get('cost')
             # Save net
             # Mark the nets as stub in order to set them
             # as passive interfaces in the OSPF configuration
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'stub': True}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'stub': True}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': True}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': True}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
-        # Iterate over the mgmt links and generate them
-        for mgmt_link, mgmt_link_properties in zip(self.mgmt_links,
-                                                   self.mgmt_links_properties):
-            # Get the left hand side of the pair
-            lhs = mgmt_link[0]
-            # Get the right hand side of the pair
-            rhs = mgmt_link[1]
-            # Create the mgmt link
-            self.addLink(lhs, rhs, bw=mgmt_link_properties['bw'],
-                         delay=mgmt_link_properties['delay'])
-            # Get Port number
-            portNumber = self.port(lhs, rhs)
-            # Create lhs_intf
-            lhsintf = "%s-eth%d" % (lhs, portNumber[0])
-            # Create rhs_intf
-            rhsintf = "%s-eth%d" % (rhs, portNumber[1])
-            # Assign a data-plane net to this link
-            net = mgmt_link_properties['net']
-            # Get lhs ip
-            lhsip = "%s/%d" % (mgmt_link_properties['iplhs'],
-                               NetAllocator.prefix)
-            # Get rhs ip
-            rhsip = "%s/%d" % (mgmt_link_properties['iprhs'],
-                               NetAllocator.prefix)
-            # Add edge to the topology
-            topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
-                              rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
-            # Add the reverse edge to the topology
-            topology.add_edge(rhs, lhs, lhs_intf=rhsintf,
-                              rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
-            # Save net
-            # Mark the nets as stub in order to set them
-            # as passive interfaces in the OSPF configuration
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net,
-                      'stub': False, 'mgmt': True}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip,
-                      'net': net, 'stub': False, 'mgmt': True}
-            self.nodeInfo(lhs)['nets'].append(lhsnet)
-            self.nodeInfo(rhs)['nets'].append(rhsnet)
-            if lhs in self.controllers:
-                (self.nodeInfo(lhs)['neighbors']
-                 .append(nodes_to_loopbackip[rhs]))
-            elif rhs in self.controllers:
-                (self.nodeInfo(rhs)['neighbors']
-                 .append(nodes_to_loopbackip[lhs]))
 
 
 # Utility function to dump relevant information of the emulation
@@ -379,7 +308,7 @@ def dump():
         # Create header
         nodes = "declare -a NODES=("
         # Iterate over management ips
-        for node, ip in nodes_to_mgmt.iteritems():
+        for node, ip in nodes_to_mgmt.items():
             # Add the nodes one by one
             nodes = nodes + "%s " % ip
         if nodes_to_mgmt != {}:

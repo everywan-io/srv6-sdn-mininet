@@ -33,7 +33,7 @@ class MgmtAllocator(object):
   prefix = 64
 
   def __init__(self): 
-    print "*** Calculating Available Mgmt Addresses"
+    print("*** Calculating Available Mgmt Addresses")
     self.mgmtnet = (IPv6Network(self.net)).hosts()
   
   def nextMgmtAddress(self):

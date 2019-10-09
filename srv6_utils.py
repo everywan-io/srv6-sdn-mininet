@@ -23,29 +23,60 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
-from srv6_generators import RANGE_FOR_AREA_0
-
-# Mininet
-from mininet.node import Host
-from mininet.log import error
 
 # General imports
 import os
 import shutil
 import time
 import sys
+import re
+from datetime import datetime
+# Mininet dependencies
+from mininet.node import Host
+from mininet.log import error
+# SRv6 dependencies
+from srv6_generators import RANGE_FOR_AREA_0
 
-# Path to the southbound gRPC-based server
+################## Setup these variables ##################
+
+# Configure the southbound interface
+#SOUTHBOUND_INTERFACE = 'NONE'
+SOUTHBOUND_INTERFACE = 'GRPC'
+# Interval between two hello packets (in seconds)
+HELLO_INTERVAL = 1
+# How long we should be wait for hello packets
+# before we declare the neighbor dead (in seconds)
+DEAD_INTERVAL = 3
+# How long we should be wait before retransmitting
+# Database Description and Link State Request packets (in seconds)
+RETRANSMIT_INTERVAL = 3
+# The maximum time allowed between sending unsolicited
+# multicast router advertisement from the interface (in seconds)
+RA_INTERVAL = 10
+# Path to the data plane folder
 DATA_PLANE_FOLDER = '../srv6-sdn-data-plane'
-SB_GRPC_SERVER_PATH = '%s/southbound/grpc/sb_grpc_server.py' % DATA_PLANE_FOLDER
 
-if DATA_PLANE_FOLDER == '':
-    print 'Error: Set DATA_PLANE_FOLDER variable in srv6_utils.py'
-    sys.exist(-2)
+###########################################################
 
-if not os.path.exists(DATA_PLANE_FOLDER):
-    error('Error: DATA_PLANE_FOLDER variable in srv6_utils.py points to a non existing folder\n')
-    sys.exist(-2)
+
+SUPPORTED_SB_INTERFACES = ['GRPC']
+# Check dataplane and gRPC server paths
+if SOUTHBOUND_INTERFACE != 'NONE':
+    if DATA_PLANE_FOLDER == '':
+        error('Error: Set DATA_PLANE_FOLDER variable in srv6_utils.py')
+        sys.exit(-2)
+    if not os.path.exists(DATA_PLANE_FOLDER):
+        error('Error: DATA_PLANE_FOLDER variable in srv6_utils.py '
+              'points to a non existing folder\n')
+        sys.exit(-2)
+    if SOUTHBOUND_INTERFACE not in SUPPORTED_SB_INTERFACES:
+        error('Error: %s interface not yet supported or invalid\n'
+              'Supported southbound interfaces: %s' % SUPPORTED_SB_INTERFACES)
+        sys.exit(-2)
+# Path of the gRPC southbound server
+SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py -d'
+                       % DATA_PLANE_FOLDER)
+
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
@@ -61,6 +92,8 @@ class SRv6Router(Host):
         Host.__init__(self, name, privateDirs=dirs, *args, **kwargs)
         self.dir = "/tmp/%s" % name
         self.nets = []
+        if os.path.exists(self.dir):
+            shutil.rmtree(self.dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
@@ -70,13 +103,11 @@ class SRv6Router(Host):
         # Init steps
         Host.config(self, **kwargs)
         # Iterate over the interfaces
-        first = True
-        for intf in self.intfs.itervalues():
+        for intf in self.intfs.values():
             # Remove any configured address
             self.cmd('ifconfig %s 0' % intf.name)
             # For the first one, let's configure the mgmt address
-            if first:
-                first = False
+            if intf.name == kwargs.get('mgmtintf'):
                 self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
         self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
@@ -98,26 +129,28 @@ class SRv6Router(Host):
         self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
         # Enable IPv4 forwarding
         self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
-        # Disable rp filter
+        # Disable Reverse Path Forwarding filter
         self.cmd("sysctl -w net.ipv4.conf.all.rp_filter=0")
-        # Enable SRv6 on the interface
+        # Enable SRv6 on the interface+
         self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
-        # Disable RA accept
+        # Disable RA accept (stateless address autoconfiguration)
         self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
         # Force Linux to keep all IPv6 addresses on an interface down event
-        self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
+        self.cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
         # Iterate over the interfaces
-        for intf in self.intfs.itervalues():
-            # Force Linux to keep all IPv6 addresses on an interface down event
-            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
+        for intf in self.intfs.values():
             # Enable IPv6 forwarding
             self.cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
-            # Enable SRv6 on the interface
-            self.cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
             # Enable IPv4 forwarding
             self.cmd("sysctl -w net.ipv4.conf.%s.forwarding=1" % intf.name)
-            # Disable rp filter
+            # Disable Reverse Path Forwarding filter
             self.cmd("sysctl -w net.ipv4.conf.%s.rp_filter=0" % intf.name)
+            # Enable SRv6 on the interface
+            self.cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
+            # Disable RA accept (stateless address autoconfiguration)
+            self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=0")
+            # Force Linux to keep all IPv6 addresses on an interface down event
+            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
         # Zebra and Quagga config
         if len(self.nets) > 0:
             zebra = open("%s/zebra.conf" % self.dir, 'w')
@@ -135,64 +168,62 @@ class SRv6Router(Host):
                 zebra.write("ipv6 route %s lo\n!\n" % routernet)
             # Iterate over the nets and build interface part of the configs
             for net in self.nets:
-                cost = 1698
-                ra_interval = 10
-                # To mitigate annoying warnings
-                if net['intf'] == 'lo':
-                    ospfd.write("interface %s\n!ipv6 ospf6 cost %s\n"
-                                "ipv6 ospf6 hello-interval %s\n!\n" %
-                                (net['intf'], cost, 600))
-                else:
+                # Link cost for the interface
+                cost = net.get('cost', None)
+                # Non-loopback interface
+                if net['intf'] != 'lo':
+                    # Set the IPv6 address and the network
+                    # discovery prefix in the zebra configuration
+                    zebra.write("interface %s\n"
+                                "link-detect\n"
+                                "bandwidth %s\n"
+                                "no ipv6 nd suppress-ra\n"
+                                "ipv6 nd ra-interval %s\n"
+                                "ipv6 address %s\n"
+                                "ipv6 nd prefix %s\n!\n"
+                                % (net['intf'], net['bw']*1000, RA_INTERVAL,
+                                   net['ip'], net['net']))
                     if net['stub']:
                         # Stub network
-                        ospfd.write("interface %s\nipv6 ospf6 passive\n"
-                                    "ipv6 ospf6 cost %s\n"
-                                    "ipv6 ospf6 hello-interval %s\n"
-                                    "ipv6 ospf6 dead-interval 3\n"
-                                    "ipv6 ospf6 retransmit-interval 3\n!\n"
-                                    % (net['intf'], cost, 1))
-                        if net.get('mgmt', False) is False:
-                            # Set the IPv6 address
-                            # and the network discovery prefix
-                            # in the zebra configuration
-                            zebra.write("interface %s\nlink-detect\n"
-                                        "no ipv6 nd suppress-ra\n"
-                                        "ipv6 nd ra-interval %s\n"
-                                        "ipv6 address %s\n"
-                                        "ipv6 nd prefix %s\n!\n"
-                                        % (net['intf'], ra_interval,
-                                           net['ip'], net['net']))
+                        # Set OSPF6 parameters and mark the network as
+                        # passive in order to advertise the interface as
+                        # a stub link
+                        if cost is not None:
+                            ospfd.write("interface %s\n"
+                                        "ipv6 ospf6 passive\n"
+                                        "ipv6 ospf6 cost %s\n"
+                                        "ipv6 ospf6 hello-interval %s\n"
+                                        "ipv6 ospf6 dead-interval %s\n"
+                                        "ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                        else:
+                            ospfd.write("interface %s\n"
+                                        "ipv6 ospf6 passive\n"
+                                        "ipv6 ospf6 hello-interval %s\n"
+                                        "ipv6 ospf6 dead-interval %s\n"
+                                        "ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        % (net['intf'], HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                     else:
                         # Transit network
-                        ospfd.write("interface %s\nipv6 ospf6 cost %s\n"
-                                    "ipv6 ospf6 hello-interval %s\n"
-                                    "ipv6 ospf6 dead-interval 3\n"
-                                    "ipv6 ospf6 retransmit-interval 3\n!\n"
-                                    % (net['intf'], cost, 1))
-                        if net.get('mgmt', False) is False:
-                            # Both in IPv4 and IPv6 emulation
-                            # transit networks use IPv6 addresses
-                            # Set the IPv6 address and the network
-                            # discovery prefix in the zebra configuration
-                            zebra.write("interface %s\nlink-detect\n"
-                                        "no ipv6 nd suppress-ra\n"
-                                        "ipv6 nd ra-interval %s\n"
-                                        "ipv6 address %s\n"
-                                        "ipv6 nd prefix %s\n!\n"
-                                        % (net['intf'], ra_interval,
-                                           net['ip'], net['net']))
+                        if cost is not None:
+                            ospfd.write("interface %s\n"
+                                        "no ipv6 ospf6 passive\n"
+                                        "ipv6 ospf6 cost %s\n"
+                                        "ipv6 ospf6 hello-interval %s\n"
+                                        "ipv6 ospf6 dead-interval %s\n"
+                                        "ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                         else:
-                            # Both in IPv4 and IPv6 emulation
-                            # transit networks use IPv6 addresses
-                            # Set the IPv6 address and the network
-                            # discovery prefix in the zebra configuration
-                            zebra.write("interface %s\nlink-detect\n"
-                                        "no ipv6 nd suppress-ra\n"
-                                        "ipv6 nd ra-interval %s\n"
-                                        "ipv6 address %s\n"
-                                        "ipv6 nd prefix %s\n!\n"
-                                        % (net['intf'], ra_interval,
-                                           net['ip'], net['net']))
+                            ospfd.write("interface %s\n"
+                                        "no ipv6 ospf6 passive\n"
+                                        "ipv6 ospf6 hello-interval %s\n"
+                                        "ipv6 ospf6 dead-interval %s\n"
+                                        "ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        % (net['intf'], HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -201,27 +232,56 @@ class SRv6Router(Host):
             ospfd.write("area 0.0.0.0 range %s\n" % RANGE_FOR_AREA_0)
             # Iterate again over the nets to finish area part
             for net in self.nets:
-                #if net.get('mgmt', False) is True:
                 ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
             ospfd.close()
             zebra.close()
             # Right permission and owners
-            self.cmd("chown quagga.quaggavty %s/*.conf" % self.dir)
-            self.cmd("chown quagga.quaggavty %s/." % self.dir)
             self.cmd("chown quagga %s/*.conf" % self.dir)
             self.cmd("chown quagga %s/." % self.dir)
             self.cmd("chmod 640 %s/*.conf" % self.dir)
-            # Starting daemons
+            start_time = datetime.now().replace(microsecond=0)
+            # Start daemons
             self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                      "%s/zebra.pid" % (self.dir, self.dir, self.dir))
+            while not os.path.exists("%s/zebra.log" % self.dir):
+                # Zebra daemon is not ready, wait a few milliseconds
+                print("log not ready")
+                time.sleep(.003)
+            # Wait while zebra daemon gets ready and then starts ospf6d
             # In some systems this workaround solves the issue
             # of ospf6d coming up before zebra
-            time.sleep(.001)
-            self.cmdPrint("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
+            while (True):
+                ready = False
+                with open("%s/zebra.log" % self.dir, "r") as log_file:
+                    # Process log entries
+                    for line in log_file:
+                        # Find 'zebra starting' entry
+                        m = re.search('(\d*.\d*.\d* \d*.\d*.\d*) ZEBRA: '
+                                      'Zebra (\S+) starting: (\S+)', line)
+                        if(m):
+                            try:
+                                # 'Zebra starting' entry found
+                                logentry_time = (datetime
+                                                 .strptime(m.group(1),
+                                                           '%Y/%m/%d %H:%M:%S'))
+                                # Check the entry timestamp to check if
+                                # it isn't an old entry
+                                if logentry_time >= start_time:
+                                    ready = True
+                                    break
+                            except ValueError:
+                                continue
+                if ready is True:
+                    # Zebra daemon is ready, we can start ospf6d daemon
+                    break
+                # Zebra daemon is not ready, wait a few milliseconds and retry
+                time.sleep(.003)
+            self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
-            # Starting gRPC server
-            self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
+            # Start gRPC server
+            if SOUTHBOUND_INTERFACE == 'GRPC':
+                self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
 
     # Clean up the environment
     def cleanup(self):
@@ -232,6 +292,7 @@ class SRv6Router(Host):
             shutil.rmtree(self.dir)
 
 
+# Abstraction to model a MHost
 class MHost(Host):
 
     def __init__(self, name, *args, **kwargs):
@@ -240,6 +301,8 @@ class MHost(Host):
         Host.__init__(self, name, privateDirs=dirs, *args, **kwargs)
         self.dir = "/tmp/%s" % name
         self.nets = []
+        if os.path.exists(self.dir):
+            shutil.rmtree(self.dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
@@ -248,173 +311,42 @@ class MHost(Host):
 
         # Init steps
         Host.config(self, **kwargs)
+        # Iterate over the interfaces
+        for intf in self.intfs.values():
+            # Remove any configured address
+            self.cmd('ip a flush dev %s scope global' % intf.name)
+            # For the first one, let's configure the mgmt address
+            if intf.name == kwargs.get('mgmtintf'):
+                self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
+        # Let's write the hostname in /var/mininet/hostname
+        self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
+        # Retrieve nets
+        if kwargs.get('nets', None):
+            self.nets = kwargs['nets']
+        # If requested
+        if kwargs['sshd']:
+            # Let's start sshd daemon in the hosts
+            self.cmd('/usr/sbin/sshd -D &')
         # Disable IPv6 address autoconfiguration
         self.cmd('sysctl -w net.ipv6.conf.all.autoconf=0')
+        # Enable RA accept (stateless address autoconfiguration)
         self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
+        # Force Linux to keep all IPv6 addresses on an interface down event
+        self.cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
         # Iterate over the interfaces
-        first = True
-        for intf in self.intfs.itervalues():
+        for intf in self.intfs.values():
             # Disable IPv6 address autoconfiguration on the interface
             # The addresses are configured by this script
             self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=0" % intf.name)
             # Accept Router Advertisements messages
             # Used to set a default via in the routing tables
             self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" % intf.name)
-            # Remove any configured address
-            self.cmd('ip a flush dev %s scope global' % intf.name)
-            # For the first one, let's configure the mgmt address
-            if first:
-                first = False
-                self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
-        # Let's write the hostname in /var/mininet/hostname
-        self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
-        # Retrieve nets
-        if kwargs.get('nets', None):
-            self.nets = kwargs['nets']
-        # If requested
-        if kwargs['sshd']:
-            # Let's start sshd daemon in the hosts
-            self.cmd('/usr/sbin/sshd -D &')
+            # Force Linux to keep all IPv6 addresses on an interface down event
+            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1"
+                     % intf.name)
         for net in self.nets:
             # Set the address
             self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
-        # Force Linux to keep all IPv6 addresses on an interface down event
-        self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
-
-    # Clean up the environment
-    def cleanup(self):
-
-        Host.cleanup(self)
-        # Rm dir
-        if os.path.exists(self.dir):
-            shutil.rmtree(self.dir)
-
-
-class SRv6Controller(Host):
-
-    def __init__(self, name, *args, **kwargs):
-
-        dirs = ['/var/mininet']
-        Host.__init__(self, name, privateDirs=dirs, *args, **kwargs)
-        self.dir = "/tmp/%s" % name
-        self.nets = []
-        if not os.path.exists(self.dir):
-            os.makedirs(self.dir)
-
-    # Config hook
-    def config(self, **kwargs):
-
-        # Init steps
-        Host.config(self, **kwargs)
-        # Iterate over the interfaces
-        first = True
-        for intf in self.intfs.itervalues():
-            # Remove any configured address
-            self.cmd('ifconfig %s 0' % intf.name)
-            # For the first one, let's configure the mgmt address
-            if first:
-                first = False
-                self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
-        # Let's write the hostname in /var/mininet/hostname
-        self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
-        # Retrieve nets
-        if kwargs.get('nets', None):
-            self.nets = kwargs['nets']
-        # If requested
-        if kwargs['sshd']:
-            # Let's start sshd daemon in the hosts
-            self.cmd('/usr/sbin/sshd -D &')
-        # Configure the loopback address
-        if kwargs.get('loopbackip', None):
-            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
-            self.nets.append({'intf': 'lo', 'ip': kwargs['loopbackip'],
-                             'net': kwargs['loopbackip']})
-        # Enable IPv6 forwarding
-        self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
-        # Enable SRv6 on the interface
-        self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
-        # Disable RA accept
-        self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=1")
-        # Force Linux to keep all IPv6 addresses on an interface down event
-        self.cmd("echo 1 > /proc/sys/net/ipv6/conf/all/keep_addr_on_down")
-        # Iterate over the interfaces
-        for intf in self.intfs.itervalues():
-            # Force Linux to keep all IPv6 addresses on an interface down event
-            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
-            # Enable IPv6 forwarding
-            self.cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
-            # Enable SRv6 on the interface
-            self.cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
-        # Zebra and Quagga config
-        if len(self.nets) > 0:
-            zebra = open("%s/zebra.conf" % self.dir, 'w')
-            ospfd = open("%s/ospf6d.conf" % self.dir, 'w')
-            ospfd.write("! -*- ospf6 -*-\n!\nhostname %s\n" % self.name)
-            ospfd.write("password srv6\nlog file %s/ospf6d.log\n!\n" %
-                        self.dir)
-            zebra.write("! -*- zebra -*-\n!\nhostname %s\n" % self.name)
-            zebra.write("password srv6\nenable password srv6\n"
-                        "log file %s/zebra.log\n!\n" % self.dir)
-            # Iterate over the nets and build interface part of the configs
-            for net in self.nets:
-                cost = 1
-                # To mitigate annoying warnings
-                if net['intf'] == 'lo':
-                    ospfd.write("interface %s\n!ipv6 ospf6 cost %s\n"
-                                "ipv6 ospf6 hello-interval %s\n!\n"
-                                % (net['intf'], cost, 600))
-                else:
-                    if net['stub']:
-                        # Mark the link as stub
-                        ospfd.write("interface %s\nipv6 ospf6 passive\n"
-                                    "ipv6 ospf6 cost %s\n"
-                                    "ipv6 ospf6 hello-interval %s\n"
-                                    "ipv6 ospf6 dead-interval 3\n"
-                                    "ipv6 ospf6 retransmit-interval 3\n!\n"
-                                    % (net['intf'], cost, 1))
-                    else:
-                        ospfd.write("interface %s\nipv6 ospf6 cost %s\n"
-                                    "ipv6 ospf6 hello-interval %s\n"
-                                    "ipv6 ospf6 dead-interval 3\n"
-                                    "ipv6 ospf6 retransmit-interval 3\n!\n"
-                                    % (net['intf'], cost, 1))
-                        if net.get('mgmt', False) is True:
-                            # Both in IPv4 and IPv6 emulation
-                            # transit networks use IPv6 addresses
-                            # Set the IPv6 address and the network
-                            # discovery prefix in the zebra configuration
-                            zebra.write("interface %s\nlink-detect\n"
-                                        "ipv6 address %s\n"
-                                        "ipv6 nd prefix %s\n!\n"
-                                        % (net['intf'],
-                                           net['ip'], net['net']))
-            # Finishing ospf6d conf
-            if kwargs.get('routerid', None):
-                routerid = kwargs['routerid']
-            ospfd.write("router ospf6\nrouter-id %s\n"
-                        "no redistribute static\nno redistribute connected\n"
-                        "no redistribute kernel\n!\n" % routerid)
-            ospfd.write("area 0.0.0.0 range %s\n" % RANGE_FOR_AREA_0)
-            # Iterate again over the nets to finish area part
-            for net in self.nets:
-                ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
-            ospfd.write("!\n")
-            ospfd.close()
-            zebra.close()
-            # Right permission and owners
-            self.cmd("chown quagga.quaggavty %s/*.conf" % self.dir)
-            self.cmd("chown quagga.quaggavty %s/." % self.dir)
-            self.cmd("chown quagga %s/*.conf" % self.dir)
-            self.cmd("chown quagga %s/." % self.dir)
-            self.cmd("chmod 640 %s/*.conf" % self.dir)
-            # Starting daemons
-            self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
-                     "%s/zebra.pid" % (self.dir, self.dir, self.dir))
-            # In some systems this workaround solves
-            # the issue of ospf6d coming up before zebra
-            time.sleep(.001)
-            self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
-                     "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
 
     # Clean up the environment
     def cleanup(self):
