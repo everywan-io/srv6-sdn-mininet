@@ -37,12 +37,15 @@ from mininet.topo import Topo
 from mininet.node import RemoteController, OVSBridge
 from mininet.link import TCLink
 from mininet.cli import CLI
+from mininet.log import error
+# ipaddress dependencies
+from ipaddress import IPv6Network
 # NetworkX dependencies
 import networkx as nx
 from networkx.readwrite import json_graph
 # SRv6 dependencies
 from srv6_topo_parser import SRv6TopoParser
-from srv6_utils import SRv6Router, MHost
+from srv6_utils import SRv6Router, MHost, SRv6Controller, WANRouter
 from srv6_generators import PropertiesGenerator
 from srv6_generators import LoopbackAllocator
 from srv6_generators import NetAllocator
@@ -64,7 +67,13 @@ topology = nx.MultiDiGraph()
 class SRv6Topo(Topo):
 
     # Init of the topology
-    def __init__(self, topo="", **opts):
+    def __init__(self, topo="", out_of_band_controller=False,
+                 wan_router_private_addr=False, wan_router_script=None,
+                 use_ipv4_addressing=False, **opts):
+        # Arguments
+        self.out_of_band_controller = out_of_band_controller
+        self.wan_router_private_addr = wan_router_private_addr
+        self.wan_router_script = wan_router_script
         # Parse topology from json file
         parser = SRv6TopoParser(topo, verbose=False)
         parser.parse_data()
@@ -73,10 +82,27 @@ class SRv6Topo(Topo):
         p_routers_properties = parser.getRoutersProperties()
         self._hosts = parser.getHosts()
         p_hosts_properties = parser.getHostsProperties()
+        # Identify the controller
+        self.controller = None
+        for host, p_host_properties in zip(self._hosts, p_hosts_properties):
+            if p_host_properties.get('is_controller') is True:
+                if self.controller is not None:
+                    error('Error: Multi-controller topologies are not supported')
+                    exit(-1)                    
+                self.controller = host
+        # Add the WAN router to the hosts
+        self.wan_router = 'wanrouter'
+        self._hosts.append(self.wan_router)
+        p_hosts_properties.append({'is_wan_router': True})
+        # Process links
         self.core_links = parser.getCoreLinks()
         p_core_links_properties = parser.getCoreLinksProperties()
         self.edge_links = parser.getEdgeLinks()
         p_edge_links_properties = parser.getEdgeLinksProperties()
+        # Add controller-WAN router link
+        if self.wan_router is not None and self.controller is not None:
+            self.edge_links.append((self.controller, self.wan_router))
+            p_edge_links_properties.append({'bw': 1000, 'delay': 0})
         # Properties generator
         generator = PropertiesGenerator()
         # Second step is the generation of the nodes parameters
@@ -88,17 +114,14 @@ class SRv6Topo(Topo):
             p_router_properties['loopback'] = router_properties.loopback
             p_router_properties['routerid'] = router_properties.routerid
             p_router_properties['routernet'] = router_properties.routernet
-            p_router_properties['mgmtip'] = router_properties.mgmtip
         self.routers_properties = p_routers_properties
         # Generation of the hosts parameters
         hosts_properties = generator.getHostsProperties(self._hosts)
         for (host_properties,
              p_host_properties) in zip(hosts_properties,
                                        p_hosts_properties):
-            p_host_properties['mgmtip'] = host_properties.mgmtip
+            p_host_properties['loopback'] = host_properties.loopback
         self.hosts_properties = p_hosts_properties
-        # Assign mgmt ip to the mgmt station
-        self.mgmtIP = generator.nextMgmtAddress()
         # Third step is the generation of the links parameters
         # Generation of the core links parameters
         core_links_properties = []
@@ -119,8 +142,13 @@ class SRv6Topo(Topo):
              p_edge_link_properties) in zip(self.edge_links,
                                             p_edge_links_properties):
             edge_link = (edge_link[0], edge_link[1])
-            edge_links_properties.append(generator
-                                         .getEdgeLinksProperties([edge_link]))
+            # We treat controller-device links as core links
+            if edge_link[0] == self.controller or edge_link[1] == self.controller:
+                edge_links_properties.append(generator
+                                             .getCoreLinksProperties([edge_link]))
+            else:
+                edge_links_properties.append(generator
+                                             .getEdgeLinksProperties([edge_link]))
         for (edge_link_properties,
              p_edge_link_properties) in zip(edge_links_properties,
                                             p_edge_links_properties):
@@ -131,81 +159,141 @@ class SRv6Topo(Topo):
         # Init steps
         Topo.__init__(self, **opts)
 
+
     # Build the topology using parser information
     def build(self, *args, **params):
+        self.wan_router = None
+        self.vias = dict()
         # Init steps
         Topo.build(self, *args, **params)
         # Add routers
         for router, router_properties in zip(self.routers,
                                              self.routers_properties):
             # Assign mgmtip, loobackip, routerid
-            mgmtIP = router_properties['mgmtip']
+            #mgmtIP = router_properties['mgmtip']
             loopbackIP = router_properties['loopback']
             routerid = router_properties['routerid']
             routernet = router_properties['routernet']
             loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
-            mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+            #mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
             # Add the router to the topology
-            self.addHost(name=router, cls=SRv6Router, sshd=True, mgmtip=mgmtip,
-                         loopbackip=loopbackip, routerid=routerid, routernet=routernet, nets=[])
+            self.addHost(name=router, cls=SRv6Router, sshd=True,
+                         loopbackip=loopbackip, routerid=routerid,
+                         routernet=routernet, nets=[], routes=[])
             # Save mapping node to mgmt
-            nodes_to_mgmt[router] = str(mgmtIP)
+            #nodes_to_mgmt[router] = str(mgmtIP)
             # Save mapping node to loopbackip
             nodes_to_loopbackip[router] = str(loopbackIP)
             # Add node to the topology graph
-            topology.add_node(router, mgmtip=mgmtip, loopbackip=loopbackip,
+            topology.add_node(router, loopbackip=loopbackip,
                               routerid=routerid, type="router")
+        print('propr', self.hosts_properties)
         # Add hosts
         for host, host_properties in zip(self._hosts, self.hosts_properties):
             # Assign mgmtip, loobackip, routerid
-            mgmtIP = host_properties['mgmtip']
-            mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
-            # Add the host to the topology
-            self.addHost(name=host, cls=MHost, sshd=True,
-                         mgmtip=mgmtip, nets=[])
-            # Save mapping node to mgmt
-            nodes_to_mgmt[host] = str(mgmtIP)
-            # Add node to the topology graph
-            topology.add_node(host, mgmtip=mgmtip, type="host")
-        # Create the mgmt switch
-        br_mgmt = self.addSwitch(name='br-mgmt1', cls=OVSBridge)
-        # Assign the mgmt ip to the mgmt station
-        mgmtIP = self.mgmtIP
-        mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
-        print(mgmtip)
-        # Mgmt name
-        mgmt = 'mgmt'
-        # Create the mgmt node in the root namespace
-        self.addHost(name=mgmt, cls=SRv6Router, sshd=False,
-                     mgmtip=mgmtip, inNamespace=False)
-        nodes_to_mgmt[mgmt] = str(mgmtIP)
-        # Create a link between mgmt switch and mgmt station
-        self.addLink(mgmt, br_mgmt, bw=1000, delay=0)
-        # Get Port number
-        portNumber = self.port(mgmt, br_mgmt)
-        # Get management interface
-        mgmtintf = "%s-eth%d" % (mgmt, portNumber[0])
-        # Add management interface to the node info
-        self.nodeInfo(mgmt)['mgmtintf'] = mgmtintf
-        # Connect all the routers to the management network
-        for router in self.routers:
-            # Create a link between mgmt switch and the router
-            self.addLink(router, br_mgmt, bw=1000, delay=0)
+            is_controller = host_properties.get('is_controller', False)
+            is_wan_router = host_properties.get('is_wan_router', False)
+            #mgmtIP = host_properties['mgmtip']
+            loopbackIP = router_properties['loopback']
+            #mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+            if is_controller:
+                # Add the controller to the topology
+                self.addHost(name=host, cls=SRv6Controller, sshd=True, in_band=False,
+                             loopbackip=loopbackip, nets=[], routes=[])
+                # Add node to the topology graph
+                topology.add_node(host, loopbackip=loopbackip, type="controller")
+                # Save controller loopback IP
+                self.controller_loopbackip = loopbackip
+            elif is_wan_router:
+                if self.wan_router is not None:
+                    error('Error: only a WAN router is supported')
+                    exit(-1)
+                self.wan_router = host
+                # Add the WAN router to the topology
+                self.addHost(name=host, cls=WANRouter, sshd=True,
+                             wan_router_script=self.wan_router_script,
+                             loopbackip=loopbackip, nets=[], routes=[])
+                # Add node to the topology graph
+                topology.add_node(host, loopbackip=loopbackip, type="controller")
+            else:
+                # Add the host to the topology
+                self.addHost(name=host, cls=MHost, sshd=True,
+                             loopbackip=loopbackip, nets=[])
+                # Add node to the topology graph
+                topology.add_node(host, loopbackip=loopbackip, type="host")
+        # Configure the controller and the WAN router
+        if self.out_of_band_controller:
+            nets = IPv6Network('2000::/16'.decode())
+            nets = nets.subnets(new_prefix=64)
+            # Add the controller to the topology
+            self.controller = 'controller'
+            controller_loopbackip = 'fcff::1/32'
+            self.addHost(name=self.controller, cls=SRv6Controller, sshd=False,
+                         inNamespace=False, in_band=False, nets=[])
+            # Add the WAN router to the topology
+            self.wan_router = 'wanrouter'
+            # Assign a data-plane net to this link
+            if self.wan_router_private_addr:
+                net = IPv6Network('2002::/16'.decode())
+                hosts = net.hosts()
+                # Get lhs ip
+                lhsip = next(hosts).__str__()
+                # Get rhs ip
+                rhsip = next(hosts).__str__()
+            else:
+                net = next(nets)
+                hosts = net.hosts()
+                # Get lhs ip
+                lhsip = next(hosts).__str__()
+                # Get rhs ip
+                rhsip = next(hosts).__str__()
+                net = net.__str__()
+            controller_wan_router_net = net
+            # Create a link between controller and WAN router
+            self.addLink(self.controller, self.wan_router, bw=1000, delay=0)
             # Get Port number
-            portNumber = self.port(router, br_mgmt)
-            # Get management interface
-            mgmtintf = "%s-eth%d" % (router, portNumber[0])
-            # Add management interface to the node info
-            self.nodeInfo(router)['mgmtintf'] = mgmtintf
-        for host in self._hosts:
-            # Create a link between mgmt switch and the host
-            self.addLink(host, br_mgmt, bw=1000, delay=0)
-            # Get Port number
-            portNumber = self.port(host, br_mgmt)
-            # Get management interface
-            mgmtintf = "%s-eth%d" % (host, portNumber[0])
-            # Add management interface to the node info
-            self.nodeInfo(host)['mgmtintf'] = mgmtintf
+            portNumber = self.port(self.controller, self.wan_router)
+            # Create lhs_intf
+            lhsintf = "%s-eth%d" % (self.controller, portNumber[0])
+            # Create rhs_intf
+            rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
+            # Configure the default via of the controller and the WAN router
+            self.nodeInfo(self.controller)['default_via'] = rhsip
+            self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': lhsip})
+            # Save net
+            lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
+            rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
+            self.nodeInfo(self.controller)['nets'].append(lhsnet)
+            self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
+            # Connect all the routers to the management network
+            for router in self.routers:
+                # Assign a data-plane net to this link
+                net = next(nets)
+                hosts = net.hosts()
+                # Get lhs ip
+                lhsip = next(hosts).__str__()
+                # Get rhs ip
+                rhsip = next(hosts).__str__()
+                # Create a link between the WAN router and the router
+                self.addLink(router, self.wan_router, bw=1000, delay=0)
+                # Get Port number
+                portNumber = self.port(router, self.wan_router)
+                # Create lhs_intf
+                lhsintf = "%s-eth%d" % (router, portNumber[0])
+                # Create rhs_intf
+                rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
+                # Add the route to the router
+                self.nodeInfo(router)['routes'].append({'dest': controller_loopbackip, 'via': rhsip})
+                self.nodeInfo(router)['routes'].append({'dest': controller_wan_router_net, 'via': rhsip})
+                # Save net
+                lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
+                rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
+                lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
+                rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
+                self.nodeInfo(router)['nets'].append(lhsnet)
+                self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
         # Iterate over the core links and generate them
         for core_link, core_link_properties in zip(self.core_links,
                                                    self.core_links_properties):
@@ -243,6 +331,8 @@ class SRv6Topo(Topo):
             rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': False}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
+        print('links', self.edge_links)
+        print(self.controller)
         # Iterate over the edge links and generate them
         for edge_link, edge_link_properties in zip(self.edge_links,
                                                    self.edge_links_properties):
@@ -250,6 +340,13 @@ class SRv6Topo(Topo):
             lhs = edge_link[0]
             # Get the right hand side of the pair
             rhs = edge_link[1]
+            # Connect the routers to the WAN router instead of controller
+            if lhs == self.controller and rhs in self.routers:
+                print('contr', lhs, rhs)
+                lhs = self.wan_router
+            elif lhs in self.routers and rhs == self.controller:
+                print('contr2', lhs, rhs)
+                rhs = self.wan_router
             # Create the edge link
             self.addLink(lhs, rhs, bw=edge_link_properties['bw'],
                          delay=edge_link_properties['delay'])
@@ -259,14 +356,51 @@ class SRv6Topo(Topo):
             lhsintf = "%s-eth%d" % (lhs, portNumber[0])
             # Create rhs_intf
             rhsintf = "%s-eth%d" % (rhs, portNumber[1])
-            # Assign a data-plane net to this link
-            net = edge_link_properties['net']
-            # Get lhs ip
-            lhsip = "%s/%d" % (edge_link_properties['iplhs'],
-                               NetAllocator.prefix)
-            # Get rhs ip
-            rhsip = "%s/%d" % (edge_link_properties['iprhs'],
-                               NetAllocator.prefix)
+            # Use private addresses
+            if lhs == self.controller and rhs == self.wan_router:
+
+                # Assign a data-plane net to this link
+                net = edge_link_properties['net']
+                # Get lhs ip
+                lhsip = edge_link_properties['iplhs']
+                print('sjsjsj0', lhsip)
+                # Get rhs ip
+                rhsip = edge_link_properties['iprhs']
+                net = net.__str__()
+                if self.wan_router_private_addr:
+                    net = IPv6Network('fcfa::/16'.decode())
+                    hosts = net.hosts()
+                    # Get lhs ip
+                    lhsip = next(hosts).__str__()
+                    # Get rhs ip
+                    rhsip = next(hosts).__str__()
+                    net = net.__str__()
+                self.controller_wan_router_net = net
+            else:
+                # Assign a data-plane net to this link
+                net = edge_link_properties['net']
+                # Get lhs ip
+                lhsip = edge_link_properties['iplhs']
+                print('sjsjsj0', lhsip)
+                # Get rhs ip
+                rhsip = edge_link_properties['iprhs']
+                net = net.__str__()
+            # Configure the default via of the controller and the WAN router
+            if lhs == self.controller and rhs == self.wan_router:
+                self.nodeInfo(self.controller)['default_via'] = rhsip
+                self.nodeInfo(self.wan_router)['routes'].append({'dest': self.controller_loopbackip, 'via': lhsip})
+            elif lhs == self.wan_router:
+                self.nodeInfo(self.wan_router)['default_via'] = rhsip
+            elif rhs == self.wan_router:
+                self.nodeInfo(self.wan_router)['default_via'] = lhsip
+            # Add the route to the router
+            if lhs in self.routers and rhs == self.wan_router:
+                self.vias[lhs] = rhsip
+            if rhs in self.routers and lhs == self.wan_router:
+                self.vias[rhs] = lhsip
+                print('here2\n\n')
+            lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
+            rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -283,6 +417,47 @@ class SRv6Topo(Topo):
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
 
+
+        for router in self.vias:
+            self.nodeInfo(router)['routes'].append({'dest': self.controller_loopbackip, 'via': self.vias[router]})
+            self.nodeInfo(router)['routes'].append({'dest': self.controller_wan_router_net, 'via': self.vias[router]})
+        '''
+        if self.out_of_band_controller:
+            pass
+        else:
+
+
+        if self.controller is not None:
+            for edge_link, edge_link_properties in zip(self.edge_links, self.edge_links_properties):
+                if edge_link[0] == self.
+            # Assign a data-plane net to this link
+            net = edge_link_properties['net']
+            # Get lhs ip
+            lhsip = "%s/%d" % (core_link_properties['iplhs'],
+                               NetAllocator.prefix)
+            # Get rhs ip
+            rhsip = "%s/%d" % (core_link_properties['iprhs'],
+                               NetAllocator.prefix)
+            # Get Port number
+            portNumber = self.port(self.controller, self.wan_router)
+            # Create lhs_intf
+            lhsintf = "%s-eth%d" % (self.controller, portNumber[0])
+            # Create rhs_intf
+            rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
+            # Save net
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
+            self.nodeInfo(self.controller)['nets'].append(lhsnet)
+            self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
+            # Get the loopback IP of the controller
+            for host, host_properties in zip(self._hosts, self.hosts_properties):
+                if host == self.controller:
+                    controller_loopbackip = host_properties['loopback']
+                    break
+            for router in self.routers:
+                # Add the route to the devices
+                self.nodeInfo(router)['routes'].append({'dest': controller_loopbackip, 'via': wan_router})
+        '''
 
 # Utility function to dump relevant information of the emulation
 def dump():
@@ -336,6 +511,10 @@ def deploy(options):
     topologyFile = options.topology
     clean_all = options.clean_all
     no_cli = options.no_cli
+    wan_router_private_addr = options.wan_router_private_addr
+    ipv4_addressing = options.ipv4_addressing
+    #firewall_type = options.firewall
+    out_of_band_controller = options.out_of_band_controller
     # Clean all - clean and exit
     if clean_all:
         stopAll()
@@ -343,7 +522,10 @@ def deploy(options):
     # Set Mininet log level to info
     setLogLevel('info')
     # Create Mininet topology
-    topo = SRv6Topo(topo=topologyFile)
+    topo = SRv6Topo(topo=topologyFile,
+                    out_of_band_controller=out_of_band_controller,
+                    wan_router_private_addr=wan_router_private_addr,
+                    use_ipv4_addressing=ipv4_addressing)
     # Create Mininet net
     net = Mininet(topo=topo, link=TCLink, build=False, controller=None)
     # Build topology
@@ -375,6 +557,14 @@ def parseOptions():
     # Start without Mininet prompt - useful for rdcl start action
     parser.add_option('--no-cli', dest='no_cli', action='store_true',
                       help='Do not show Mininet CLI')
+    # Add a out of band controller to the topology
+    parser.add_option('--controller', dest='out_of_band_controller',
+                      default=False, action='store_true',
+                      help='Add a out of band controller to the topology')
+    # Use private addresses for the link controller - WAN router
+    parser.add_option('--wan_router_private_addr', dest='wan_router_private_addr',
+                      default=False, action='store_true',
+                      help='Use private addresses for the link controller - WAN router')
     # Parse input parameters
     (options, args) = parser.parse_args()
     # Done, return

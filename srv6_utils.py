@@ -55,6 +55,8 @@ RETRANSMIT_INTERVAL = 3
 RA_INTERVAL = 10
 # Path to the data plane folder
 DATA_PLANE_FOLDER = '../srv6-sdn-data-plane'
+# Path to the controler plane folder
+CONTROL_PLANE_FOLDER = '../srv6-sdn-control-plane'
 
 ###########################################################
 
@@ -69,14 +71,25 @@ if SOUTHBOUND_INTERFACE != 'NONE':
         error('Error: DATA_PLANE_FOLDER variable in srv6_utils.py '
               'points to a non existing folder\n')
         sys.exit(-2)
+    if CONTROL_PLANE_FOLDER == '':
+        error('Error: Set CONTROL_PLANE_FOLDER variable in srv6_utils.py')
+        sys.exit(-2)
+    if not os.path.exists(CONTROL_PLANE_FOLDER):
+        error('Error: CONTROL_PLANE_FOLDER variable in srv6_utils.py '
+              'points to a non existing folder\n')
+        sys.exit(-2)
     if SOUTHBOUND_INTERFACE not in SUPPORTED_SB_INTERFACES:
         error('Error: %s interface not yet supported or invalid\n'
               'Supported southbound interfaces: %s' % SUPPORTED_SB_INTERFACES)
         sys.exit(-2)
 # Path of the gRPC southbound server
-SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py -d'
+SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py'
                        % DATA_PLANE_FOLDER)
-
+# Path of the gRPC southbound server
+SRV6_CONTROLLER_PATH = ('%s/srv6_controller.py --ips fcff:1::1-2606 '
+                        '--period 10 --topology /tmp/topo.json '
+                        '--topo-graph /tmp/topo_graph.svg'
+                       % CONTROL_PLANE_FOLDER)
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
@@ -131,7 +144,7 @@ class SRv6Router(Host):
         self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
         # Disable Reverse Path Forwarding filter
         self.cmd("sysctl -w net.ipv4.conf.all.rp_filter=0")
-        # Enable SRv6 on the interface+
+        # Enable SRv6 on the interface
         self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
         # Disable RA accept (stateless address autoconfiguration)
         self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
@@ -224,6 +237,13 @@ class SRv6Router(Host):
                                         "ipv6 ospf6 retransmit-interval %s\n!\n"
                                         % (net['intf'], HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+            # Configure the routes
+            if kwargs.get('routes', None):
+                for route in kwargs['routes']:
+                    dest = route['dest']
+                    via = route['via']
+                    zebra.write("ipv6 route %s %s\n"  % (dest, via))
+                    print('command:n\n ', "ipv6 route %s %s\n"  % (dest, via))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -234,20 +254,24 @@ class SRv6Router(Host):
             for net in self.nets:
                 ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
+            print('3')
             ospfd.close()
+            print('4')
             zebra.close()
+            print('5')
             # Right permission and owners
             self.cmd("chown quagga %s/*.conf" % self.dir)
             self.cmd("chown quagga %s/." % self.dir)
             self.cmd("chmod 640 %s/*.conf" % self.dir)
             start_time = datetime.now().replace(microsecond=0)
             # Start daemons
-            self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                      "%s/zebra.pid" % (self.dir, self.dir, self.dir))
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
                 time.sleep(.003)
+            print('6')
             # Wait while zebra daemon gets ready and then starts ospf6d
             # In some systems this workaround solves the issue
             # of ospf6d coming up before zebra
@@ -346,12 +370,73 @@ class MHost(Host):
                      % intf.name)
         for net in self.nets:
             # Set the address
-            self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
+            self.cmdPrint('ip a a %s dev %s' % (net['ip'], net['intf']))
 
-    # Clean up the environment
-    def cleanup(self):
 
-        Host.cleanup(self)
-        # Rm dir
-        if os.path.exists(self.dir):
-            shutil.rmtree(self.dir)
+# Abstraction to model a SRv6Controller
+class SRv6Controller(MHost):
+
+    # Config hook
+    def config(self, **kwargs):
+
+        MHost.config(self, **kwargs)
+        # Configure the default via
+        default_via = kwargs.get('default_via')
+        if default_via is not None:
+            print('ip -6 route add default via %s' % default_via)
+            self.cmdPrint('ip -6 route add default via %s' % default_via)
+        # Configure the loopback address
+        if kwargs.get('loopbackip', None):
+            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.nets.append({
+              'intf': 'lo',
+              'ip': kwargs['loopbackip'],
+              'net': kwargs['loopbackip']})
+        # Start the controller
+        if kwargs.get('in_band') is True:
+            self.cmd("%s %s --in-band &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
+        else:
+            self.cmd("%s %s &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
+
+
+# Abstraction to model a SRv6Firewall
+class WANRouter(MHost):
+
+    # Config hook
+    def config(self, **kwargs):
+
+        MHost.config(self, **kwargs)
+        script = kwargs.get('script')
+        if script is not None:
+            pass
+        '''
+        if firewall_type == 'stateless':
+            #self.cmd("bash /home/user/repos/firewall/stateless_firewall.sh")
+            self.cmd("bash scripts/stateless_firewall.sh")
+        elif firewall_type == 'stateful':
+            #self.cmd("bash /home/user/repos/firewall/stateful_firewall.sh")
+            self.cmd("bash scripts/stateful_firewall.sh")
+        else:
+            print('ERROR')
+        '''
+        # Enable IPv6 forwarding
+        self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
+        # Enable IPv4 forwarding
+        self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
+        # Configure the loopback address
+        if kwargs.get('loopbackip', None):
+            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.nets.append({
+              'intf': 'lo',
+              'ip': kwargs['loopbackip'],
+              'net': kwargs['loopbackip']})
+        # Configure the routes
+        if kwargs.get('routes', None):
+            for route in kwargs['routes']:
+                dest = route['dest']
+                via = route['via']
+                self.cmdPrint("ip -6 route add %s via %s\n"  % (dest, via))
+        # Configure the default via
+        default_via = kwargs.get('default_via')
+        if default_via is not None:
+            self.cmdPrint('ip -6 route add default via %s' % default_via)
