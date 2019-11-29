@@ -166,6 +166,18 @@ class SRv6Router(Host):
             self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
         # Zebra and Quagga config
         if len(self.nets) > 0:
+            if kwargs.get('use_ipv4_addressing', False):
+                self.start_quagga_ipv4(**kwargs)
+            else:
+                self.start_quagga_ipv6(**kwargs)
+        # Start gRPC server
+        if SOUTHBOUND_INTERFACE == 'GRPC':
+            self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
+
+    # Configure and start zebra and ospf6d for IPv6 emulation
+    def start_quagga_ipv6(self, **kwargs):
+        # Zebra and Quagga config
+        if len(self.nets) > 0:
             zebra = open("%s/zebra.conf" % self.dir, 'w')
             ospfd = open("%s/ospf6d.conf" % self.dir, 'w')
             ospfd.write("! -*- ospf6 -*-\n!\nhostname %s\n" % self.name)
@@ -243,7 +255,6 @@ class SRv6Router(Host):
                     dest = route['dest']
                     via = route['via']
                     zebra.write("ipv6 route %s %s\n"  % (dest, via))
-                    print('command:n\n ', "ipv6 route %s %s\n"  % (dest, via))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -254,24 +265,20 @@ class SRv6Router(Host):
             for net in self.nets:
                 ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
-            print('3')
             ospfd.close()
-            print('4')
             zebra.close()
-            print('5')
             # Right permission and owners
             self.cmd("chown quagga %s/*.conf" % self.dir)
             self.cmd("chown quagga %s/." % self.dir)
             self.cmd("chmod 640 %s/*.conf" % self.dir)
             start_time = datetime.now().replace(microsecond=0)
             # Start daemons
-            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+            self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                      "%s/zebra.pid" % (self.dir, self.dir, self.dir))
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
                 time.sleep(.003)
-            print('6')
             # Wait while zebra daemon gets ready and then starts ospf6d
             # In some systems this workaround solves the issue
             # of ospf6d coming up before zebra
@@ -303,9 +310,144 @@ class SRv6Router(Host):
                 time.sleep(.003)
             self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
-            # Start gRPC server
-            if SOUTHBOUND_INTERFACE == 'GRPC':
-                self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
+
+    # Configure and start zebra and ospf6d for IPv6 emulation
+    def start_quagga_ipv4(self, **kwargs):
+        # Zebra and Quagga config
+        if len(self.nets) > 0:
+            zebra = open("%s/zebra.conf" % self.dir, 'w')
+            ospfd = open("%s/ospfd.conf" % self.dir, 'w')
+            ospfd.write("! -*- ospf -*-\n!\nhostname %s\n" % self.name)
+            ospfd.write("password srv6\nlog file %s/ospfd.log\n!\n" %
+                        self.dir)
+            zebra.write("! -*- zebra -*-\n!\nhostname %s\n" %
+                        self.name)
+            zebra.write("password srv6\nenable password srv6\n"
+                        "log file %s/zebra.log\n!\n" % self.dir)
+            # Iterate over the nets and build interface part of the configs
+            for net in self.nets:
+                # Link cost for the interface
+                cost = net.get('cost', None)
+                # Non-loopback interface
+                if net['intf'] != 'lo':
+                    # Set the IPv6 address and the network
+                    # discovery prefix in the zebra configuration
+                    zebra.write("interface %s\n"
+                                "link-detect\n"
+                                "bandwidth %s\n"
+                                "ip address %s\n!\n"
+                                % (net['intf'], net['bw']*1000, net['ip']))
+                    if net['stub']:
+                        # Stub network
+                        # Set OSPF6 parameters and mark the network as
+                        # passive in order to advertise the interface as
+                        # a stub link
+                        if cost is not None:
+                            ospfd.write("interface %s\n"
+                                        #"ip ospf passive\n"
+                                        "ip ospf area 0.0.0.0\n"
+                                        "ip ospf cost %s\n"
+                                        "ip ospf hello-interval %s\n"
+                                        "ip ospf dead-interval %s\n"
+                                        "ip ospf retransmit-interval %s\n!\n"
+                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                        else:
+                            ospfd.write("interface %s\n"
+                                        #"ip ospf passive\n"
+                                        "ip ospf area 0.0.0.0\n"
+                                        "ip ospf hello-interval %s\n"
+                                        "ip ospf dead-interval %s\n"
+                                        "ip ospf retransmit-interval %s\n!\n"
+                                        % (net['intf'], HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                    else:
+                        # Transit network
+                        if cost is not None:
+                            ospfd.write("interface %s\n"
+                                        #"no ip ospf passive\n"
+                                        "ip ospf area 0.0.0.0\n"
+                                        "ip ospf cost %s\n"
+                                        "ip ospf hello-interval %s\n"
+                                        "ip ospf dead-interval %s\n"
+                                        "ip ospf retransmit-interval %s\n!\n"
+                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                        else:
+                            ospfd.write("interface %s\n"
+                                        #"no ip ospf passive\n"
+                                        "ip ospf area 0.0.0.0\n"
+                                        "ip ospf hello-interval %s\n"
+                                        "ip ospf dead-interval %s\n"
+                                        "ip ospf retransmit-interval %s\n!\n"
+                                        % (net['intf'], HELLO_INTERVAL,
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+            # Configure the routes
+            if kwargs.get('routes', None):
+                for route in kwargs['routes']:
+                    dest = route['dest']
+                    via = route['via']
+                    zebra.write("ip route %s %s\n"  % (dest, via))
+            # Finishing ospf6d conf
+            if kwargs.get('routerid', None):
+                routerid = kwargs['routerid']
+            ospfd.write("router ospf\nrouter-id %s\n "
+                        "redistribute static\n!\n" % routerid)
+            for net in self.nets:
+                if net.get('stub', False):
+                    ospfd.write("passive-interface %s\n!\n" % net['intf'])
+                else:
+                    ospfd.write("no passive-interface %s\n!\n" % net['intf'])
+            #ospfd.write("area 0.0.0.0 range %s\n" % RANGE_FOR_AREA_0)
+            # Iterate again over the nets to finish area part
+            #for net in self.nets:
+            #    ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
+            ospfd.write("!\n")
+            ospfd.close()
+            zebra.close()
+            # Right permission and owners
+            self.cmd("chown quagga %s/*.conf" % self.dir)
+            self.cmd("chown quagga %s/." % self.dir)
+            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            start_time = datetime.now().replace(microsecond=0)
+            # Start daemons
+            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+                          "%s/zebra.pid" % (self.dir, self.dir, self.dir))
+            while not os.path.exists("%s/zebra.log" % self.dir):
+                # Zebra daemon is not ready, wait a few milliseconds
+                print("log not ready")
+                time.sleep(.003)
+            # Wait while zebra daemon gets ready and then starts ospf6d
+            # In some systems this workaround solves the issue
+            # of ospf6d coming up before zebra
+            while (True):
+                ready = False
+                with open("%s/zebra.log" % self.dir, "r") as log_file:
+                    # Process log entries
+                    for line in log_file:
+                        # Find 'zebra starting' entry
+                        m = re.search('(\d*.\d*.\d* \d*.\d*.\d*) ZEBRA: '
+                                      'Zebra (\S+) starting: (\S+)', line)
+                        if(m):
+                            try:
+                                # 'Zebra starting' entry found
+                                logentry_time = (datetime
+                                                 .strptime(m.group(1),
+                                                           '%Y/%m/%d %H:%M:%S'))
+                                # Check the entry timestamp to check if
+                                # it isn't an old entry
+                                if logentry_time >= start_time:
+                                    ready = True
+                                    break
+                            except ValueError:
+                                continue
+                if ready is True:
+                    # Zebra daemon is ready, we can start ospf6d daemon
+                    break
+                # Zebra daemon is not ready, wait a few milliseconds and retry
+                time.sleep(.003)
+            self.cmdPrint("ospfd -f %s/ospfd.conf -d -z %s/zebra.sock -i "
+                     "%s/ospfd.pid" % (self.dir, self.dir, self.dir))
 
     # Clean up the environment
     def cleanup(self):
@@ -370,7 +512,7 @@ class MHost(Host):
                      % intf.name)
         for net in self.nets:
             # Set the address
-            self.cmdPrint('ip a a %s dev %s' % (net['ip'], net['intf']))
+            self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
 
 
 # Abstraction to model a SRv6Controller
@@ -383,8 +525,7 @@ class SRv6Controller(MHost):
         # Configure the default via
         default_via = kwargs.get('default_via')
         if default_via is not None:
-            print('ip -6 route add default via %s' % default_via)
-            self.cmdPrint('ip -6 route add default via %s' % default_via)
+            self.cmd('ip route add default via %s' % default_via)
         # Configure the loopback address
         if kwargs.get('loopbackip', None):
             self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
@@ -435,8 +576,8 @@ class WANRouter(MHost):
             for route in kwargs['routes']:
                 dest = route['dest']
                 via = route['via']
-                self.cmdPrint("ip -6 route add %s via %s\n"  % (dest, via))
+                self.cmd("ip route add %s via %s\n"  % (dest, via))
         # Configure the default via
         default_via = kwargs.get('default_via')
         if default_via is not None:
-            self.cmdPrint('ip -6 route add default via %s' % default_via)
+            self.cmd('ip route add default via %s' % default_via)

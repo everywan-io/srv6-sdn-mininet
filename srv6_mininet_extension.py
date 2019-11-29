@@ -39,17 +39,17 @@ from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import error
 # ipaddress dependencies
-from ipaddress import IPv6Network
+from ipaddress import IPv6Network, IPv4Network
 # NetworkX dependencies
 import networkx as nx
 from networkx.readwrite import json_graph
 # SRv6 dependencies
 from srv6_topo_parser import SRv6TopoParser
 from srv6_utils import SRv6Router, MHost, SRv6Controller, WANRouter
-from srv6_generators import PropertiesGenerator
+from srv6_generators import IPv6PropertiesGenerator, IPv4PropertiesGenerator
 from srv6_generators import LoopbackAllocator
-from srv6_generators import NetAllocator
-from srv6_generators import MgmtAllocator
+from srv6_generators import IPv6NetAllocator, IPv4NetAllocator
+#from srv6_generators import IPv6MgmtAllocator
 
 # nodes.sh file for setup of the nodes
 NODES_SH = "/tmp/nodes.sh"
@@ -74,6 +74,7 @@ class SRv6Topo(Topo):
         self.out_of_band_controller = out_of_band_controller
         self.wan_router_private_addr = wan_router_private_addr
         self.wan_router_script = wan_router_script
+        self.use_ipv4_addressing = use_ipv4_addressing
         # Parse topology from json file
         parser = SRv6TopoParser(topo, verbose=False)
         parser.parse_data()
@@ -88,7 +89,7 @@ class SRv6Topo(Topo):
             if p_host_properties.get('is_controller') is True:
                 if self.controller is not None:
                     error('Error: Multi-controller topologies are not supported')
-                    exit(-1)                    
+                    exit(-1)
                 self.controller = host
         # Add the WAN router to the hosts
         self.wan_router = 'wanrouter'
@@ -104,7 +105,12 @@ class SRv6Topo(Topo):
             self.edge_links.append((self.controller, self.wan_router))
             p_edge_links_properties.append({'bw': 1000, 'delay': 0})
         # Properties generator
-        generator = PropertiesGenerator()
+        if self.use_ipv4_addressing:
+            generator = IPv4PropertiesGenerator()
+            self.netprefix = IPv4NetAllocator.prefix
+        else:
+            generator = IPv6PropertiesGenerator()
+            self.netprefix = IPv6NetAllocator.prefix
         # Second step is the generation of the nodes parameters
         # Generation of the routers parameters
         routers_properties = generator.getRoutersProperties(self.routers)
@@ -125,16 +131,27 @@ class SRv6Topo(Topo):
         # Third step is the generation of the links parameters
         # Generation of the core links parameters
         core_links_properties = []
-        for core_link in self.core_links:
+        for (core_link,
+             p_core_link_properties) in zip(self.core_links,
+                                            p_core_links_properties):
             core_link = (core_link[0], core_link[1])
-            core_links_properties.append(generator
-                                         .getCoreLinksProperties([core_link]))
+            type = p_core_link_properties.get('type', 'core')
+            if type == 'core':
+                core_links_properties.append(generator
+                                             .getCoreLinksProperties([core_link]))
+            elif type == 'edge':
+                core_links_properties.append(generator
+                                             .getEdgeLinksProperties([core_link]))
+            elif type == 'access':
+                core_links_properties.append(generator
+                                             .getAccessLinksProperties([core_link]))
         for (core_link_properties,
              p_core_link_properties) in zip(core_links_properties,
                                             p_core_links_properties):
             p_core_link_properties['iplhs'] = core_link_properties[0].iplhs
             p_core_link_properties['iprhs'] = core_link_properties[0].iprhs
             p_core_link_properties['net'] = core_link_properties[0].net
+            p_core_link_properties['prefix'] = core_link_properties[0].prefix
         self.core_links_properties = p_core_links_properties
         # Generation of the edge links parameters
         edge_links_properties = []
@@ -147,15 +164,38 @@ class SRv6Topo(Topo):
                 edge_links_properties.append(generator
                                              .getCoreLinksProperties([edge_link]))
             else:
-                edge_links_properties.append(generator
-                                             .getEdgeLinksProperties([edge_link]))
+                type = p_edge_link_properties.get('type', 'edge')
+                if type == 'core':
+                    edge_links_properties.append(generator
+                                                 .getCoreLinksProperties([edge_link]))
+                elif type == 'edge':
+                    edge_links_properties.append(generator
+                                                 .getEdgeLinksProperties([edge_link]))
+                elif type == 'access':
+                    edge_links_properties.append(generator
+                                                 .getAccessLinksProperties([edge_link]))
         for (edge_link_properties,
              p_edge_link_properties) in zip(edge_links_properties,
                                             p_edge_links_properties):
             p_edge_link_properties['iplhs'] = edge_link_properties[0].iplhs
             p_edge_link_properties['iprhs'] = edge_link_properties[0].iprhs
             p_edge_link_properties['net'] = edge_link_properties[0].net
+            p_edge_link_properties['prefix'] = edge_link_properties[0].prefix
         self.edge_links_properties = p_edge_links_properties
+        # Stub links identification
+        self.stub_links = list()
+        for (edge_link,
+             p_edge_link_properties) in zip(self.edge_links,
+                                            p_edge_links_properties):
+            edge_link = (edge_link[0], edge_link[1])
+            if p_edge_link_properties.get('is_stub', False):
+                self.stub_links.append(edge_link)
+        for (core_link,
+             p_core_link_properties) in zip(self.core_links,
+                                            p_core_links_properties):
+            core_link = (core_link[0], core_link[1])
+            if p_core_link_properties.get('is_stub', False):
+                self.stub_links.append(core_link)
         # Init steps
         Topo.__init__(self, **opts)
 
@@ -174,12 +214,16 @@ class SRv6Topo(Topo):
             loopbackIP = router_properties['loopback']
             routerid = router_properties['routerid']
             routernet = router_properties['routernet']
-            loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
-            #mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+            if loopbackIP is None:
+                loopbackip = None
+            else:
+                loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
+            #mgmtip = "%s/%s" % (mgmtIP, IPv6MgmtAllocator.prefix)
             # Add the router to the topology
             self.addHost(name=router, cls=SRv6Router, sshd=True,
                          loopbackip=loopbackip, routerid=routerid,
-                         routernet=routernet, nets=[], routes=[])
+                         routernet=routernet, use_ipv4_addressing=self.use_ipv4_addressing,
+                         nets=[], routes=[])
             # Save mapping node to mgmt
             #nodes_to_mgmt[router] = str(mgmtIP)
             # Save mapping node to loopbackip
@@ -187,7 +231,6 @@ class SRv6Topo(Topo):
             # Add node to the topology graph
             topology.add_node(router, loopbackip=loopbackip,
                               routerid=routerid, type="router")
-        print('propr', self.hosts_properties)
         # Add hosts
         for host, host_properties in zip(self._hosts, self.hosts_properties):
             # Assign mgmtip, loobackip, routerid
@@ -195,10 +238,14 @@ class SRv6Topo(Topo):
             is_wan_router = host_properties.get('is_wan_router', False)
             #mgmtIP = host_properties['mgmtip']
             loopbackIP = router_properties['loopback']
-            #mgmtip = "%s/%s" % (mgmtIP, MgmtAllocator.prefix)
+            if loopbackIP is None:
+                loopbackip = None
+            else:
+                loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
+            #mgmtip = "%s/%s" % (mgmtIP, IPv6MgmtAllocator.prefix)
             if is_controller:
                 # Add the controller to the topology
-                self.addHost(name=host, cls=SRv6Controller, sshd=True, in_band=False,
+                self.addHost(name=host, cls=SRv6Controller, sshd=True, in_band=True,
                              loopbackip=loopbackip, nets=[], routes=[])
                 # Add node to the topology graph
                 topology.add_node(host, loopbackip=loopbackip, type="controller")
@@ -223,18 +270,26 @@ class SRv6Topo(Topo):
                 topology.add_node(host, loopbackip=loopbackip, type="host")
         # Configure the controller and the WAN router
         if self.out_of_band_controller:
-            nets = IPv6Network('2000::/16'.decode())
-            nets = nets.subnets(new_prefix=64)
+            if self.use_ipv4_addressing:
+                nets = IPv4Network('172.0.0.0/16'.decode())
+                nets = nets.subnets(new_prefix=30)
+                controller_loopbackip = None
+            else:
+                nets = IPv6Network('2000::/16'.decode())
+                nets = nets.subnets(new_prefix=64)
+                controller_loopbackip = 'fcff::1/32'
             # Add the controller to the topology
             self.controller = 'controller'
-            controller_loopbackip = 'fcff::1/32'
             self.addHost(name=self.controller, cls=SRv6Controller, sshd=False,
                          inNamespace=False, in_band=False, nets=[])
             # Add the WAN router to the topology
             self.wan_router = 'wanrouter'
             # Assign a data-plane net to this link
             if self.wan_router_private_addr:
-                net = IPv6Network('2002::/16'.decode())
+                if self.use_ipv4_addressing:
+                    net = IPv4Network('172.0.0.0/16'.decode())
+                else:
+                    net = IPv6Network('2002::/16'.decode())
                 hosts = net.hosts()
                 # Get lhs ip
                 lhsip = next(hosts).__str__()
@@ -259,10 +314,11 @@ class SRv6Topo(Topo):
             rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
             # Configure the default via of the controller and the WAN router
             self.nodeInfo(self.controller)['default_via'] = rhsip
-            self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': lhsip})
+            if controller_loopbackip is not None:
+                self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': lhsip})
             # Save net
-            lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
-            rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
+            lhsip = '%s/%s' % (lhsip, self.netprefix)
+            rhsip = '%s/%s' % (rhsip, self.netprefix)
             lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
             rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
             self.nodeInfo(self.controller)['nets'].append(lhsnet)
@@ -285,11 +341,12 @@ class SRv6Topo(Topo):
                 # Create rhs_intf
                 rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
                 # Add the route to the router
-                self.nodeInfo(router)['routes'].append({'dest': controller_loopbackip, 'via': rhsip})
+                if controller_loopbackip is not None:
+                    self.nodeInfo(router)['routes'].append({'dest': controller_loopbackip, 'via': rhsip})
                 self.nodeInfo(router)['routes'].append({'dest': controller_wan_router_net, 'via': rhsip})
                 # Save net
-                lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
-                rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
+                lhsip = '%s/%s' % (lhsip, self.netprefix)
+                rhsip = '%s/%s' % (rhsip, self.netprefix)
                 lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
                 rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
                 self.nodeInfo(router)['nets'].append(lhsnet)
@@ -312,12 +369,14 @@ class SRv6Topo(Topo):
             rhsintf = "%s-eth%d" % (rhs, portNumber[1])
             # Assign a data-plane net to this link
             net = core_link_properties['net']
+            # Prefix
+            prefix = core_link_properties['prefix']
             # Get lhs ip
             lhsip = "%s/%d" % (core_link_properties['iplhs'],
-                               NetAllocator.prefix)
+                               prefix)
             # Get rhs ip
             rhsip = "%s/%d" % (core_link_properties['iprhs'],
-                               NetAllocator.prefix)
+                               prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -326,13 +385,12 @@ class SRv6Topo(Topo):
                               rhs_intf=lhsintf, lhs_ip=rhsip, rhs_ip=lhsip)
             # Configure the cost of the nets
             cost = core_link_properties.get('cost')
+            is_stub = (lhs, rhs) in self.stub_links
             # Save net
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': False}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': False}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
-        print('links', self.edge_links)
-        print(self.controller)
         # Iterate over the edge links and generate them
         for edge_link, edge_link_properties in zip(self.edge_links,
                                                    self.edge_links_properties):
@@ -342,10 +400,8 @@ class SRv6Topo(Topo):
             rhs = edge_link[1]
             # Connect the routers to the WAN router instead of controller
             if lhs == self.controller and rhs in self.routers:
-                print('contr', lhs, rhs)
                 lhs = self.wan_router
             elif lhs in self.routers and rhs == self.controller:
-                print('contr2', lhs, rhs)
                 rhs = self.wan_router
             # Create the edge link
             self.addLink(lhs, rhs, bw=edge_link_properties['bw'],
@@ -358,14 +414,14 @@ class SRv6Topo(Topo):
             rhsintf = "%s-eth%d" % (rhs, portNumber[1])
             # Use private addresses
             if lhs == self.controller and rhs == self.wan_router:
-
                 # Assign a data-plane net to this link
                 net = edge_link_properties['net']
                 # Get lhs ip
                 lhsip = edge_link_properties['iplhs']
-                print('sjsjsj0', lhsip)
                 # Get rhs ip
                 rhsip = edge_link_properties['iprhs']
+                # Prefix
+                prefix = edge_link_properties['prefix']
                 net = net.__str__()
                 if self.wan_router_private_addr:
                     net = IPv6Network('fcfa::/16'.decode())
@@ -381,14 +437,16 @@ class SRv6Topo(Topo):
                 net = edge_link_properties['net']
                 # Get lhs ip
                 lhsip = edge_link_properties['iplhs']
-                print('sjsjsj0', lhsip)
                 # Get rhs ip
                 rhsip = edge_link_properties['iprhs']
+                # Prefix
+                prefix = edge_link_properties['prefix']
                 net = net.__str__()
             # Configure the default via of the controller and the WAN router
             if lhs == self.controller and rhs == self.wan_router:
                 self.nodeInfo(self.controller)['default_via'] = rhsip
-                self.nodeInfo(self.wan_router)['routes'].append({'dest': self.controller_loopbackip, 'via': lhsip})
+                if self.controller_loopbackip is not None:
+                    self.nodeInfo(self.wan_router)['routes'].append({'dest': self.controller_loopbackip, 'via': lhsip})
             elif lhs == self.wan_router:
                 self.nodeInfo(self.wan_router)['default_via'] = rhsip
             elif rhs == self.wan_router:
@@ -398,9 +456,8 @@ class SRv6Topo(Topo):
                 self.vias[lhs] = rhsip
             if rhs in self.routers and lhs == self.wan_router:
                 self.vias[rhs] = lhsip
-                print('here2\n\n')
-            lhsip = '%s/%s' % (lhsip, NetAllocator.prefix)
-            rhsip = '%s/%s' % (rhsip, NetAllocator.prefix)
+            lhsip = '%s/%s' % (lhsip, prefix)
+            rhsip = '%s/%s' % (rhsip, prefix)
             # Add edge to the topology
             topology.add_edge(lhs, rhs, lhs_intf=lhsintf,
                               rhs_intf=rhsintf, lhs_ip=lhsip, rhs_ip=rhsip)
@@ -412,52 +469,17 @@ class SRv6Topo(Topo):
             # Save net
             # Mark the nets as stub in order to set them
             # as passive interfaces in the OSPF configuration
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': True}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': True}
+            is_stub = (lhs, rhs) in self.stub_links
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
-
-
+        # Add routes to reach the controller to the routers
         for router in self.vias:
-            self.nodeInfo(router)['routes'].append({'dest': self.controller_loopbackip, 'via': self.vias[router]})
+            if self.controller_loopbackip is not None:
+                self.nodeInfo(router)['routes'].append({'dest': self.controller_loopbackip, 'via': self.vias[router]})
             self.nodeInfo(router)['routes'].append({'dest': self.controller_wan_router_net, 'via': self.vias[router]})
-        '''
-        if self.out_of_band_controller:
-            pass
-        else:
 
-
-        if self.controller is not None:
-            for edge_link, edge_link_properties in zip(self.edge_links, self.edge_links_properties):
-                if edge_link[0] == self.
-            # Assign a data-plane net to this link
-            net = edge_link_properties['net']
-            # Get lhs ip
-            lhsip = "%s/%d" % (core_link_properties['iplhs'],
-                               NetAllocator.prefix)
-            # Get rhs ip
-            rhsip = "%s/%d" % (core_link_properties['iprhs'],
-                               NetAllocator.prefix)
-            # Get Port number
-            portNumber = self.port(self.controller, self.wan_router)
-            # Create lhs_intf
-            lhsintf = "%s-eth%d" % (self.controller, portNumber[0])
-            # Create rhs_intf
-            rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
-            # Save net
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
-            self.nodeInfo(self.controller)['nets'].append(lhsnet)
-            self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
-            # Get the loopback IP of the controller
-            for host, host_properties in zip(self._hosts, self.hosts_properties):
-                if host == self.controller:
-                    controller_loopbackip = host_properties['loopback']
-                    break
-            for router in self.routers:
-                # Add the route to the devices
-                self.nodeInfo(router)['routes'].append({'dest': controller_loopbackip, 'via': wan_router})
-        '''
 
 # Utility function to dump relevant information of the emulation
 def dump():
@@ -557,6 +579,9 @@ def parseOptions():
     # Start without Mininet prompt - useful for rdcl start action
     parser.add_option('--no-cli', dest='no_cli', action='store_true',
                       help='Do not show Mininet CLI')
+    # Use IPv4 addressing
+    parser.add_option('--ipv4', dest='ipv4_addressing', default=False,
+                      action='store_true', help='Use IPv4 addressing')
     # Add a out of band controller to the topology
     parser.add_option('--controller', dest='out_of_band_controller',
                       default=False, action='store_true',
