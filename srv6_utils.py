@@ -23,6 +23,7 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
+from __future__ import print_function
 
 # General imports
 import os
@@ -109,6 +110,10 @@ class SRv6Router(Host):
             shutil.rmtree(self.dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
+        if kwargs.get('debug', False):
+            self.exec_cmd = self.cmdPrint
+        else:
+            self.exec_cmd = self.cmd
 
     # Config hook
     def config(self, **kwargs):
@@ -118,52 +123,52 @@ class SRv6Router(Host):
         # Iterate over the interfaces
         for intf in self.intfs.values():
             # Remove any configured address
-            self.cmd('ifconfig %s 0' % intf.name)
+            self.exec_cmd('ifconfig %s 0' % intf.name)
             # For the first one, let's configure the mgmt address
             if intf.name == kwargs.get('mgmtintf'):
-                self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
+                self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
-        self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
+        self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
         # Retrieve nets
         if kwargs.get('nets', None):
             self.nets = kwargs['nets']
         # If requested
         if kwargs['sshd']:
             # Let's start sshd daemon in the hosts
-            self.cmd('/usr/sbin/sshd -D &')
+            self.exec_cmd('/usr/sbin/sshd -D &')
         # Configure the loopback address
         if kwargs.get('loopbackip', None):
-            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
             self.nets.append({
               'intf': 'lo',
               'ip': kwargs['loopbackip'],
               'net': kwargs['loopbackip']})
         # Enable IPv6 forwarding
-        self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
         # Enable IPv4 forwarding
-        self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
+        self.exec_cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
         # Disable Reverse Path Forwarding filter
-        self.cmd("sysctl -w net.ipv4.conf.all.rp_filter=0")
+        self.exec_cmd("sysctl -w net.ipv4.conf.all.rp_filter=0")
         # Enable SRv6 on the interface
-        self.cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.seg6_enabled=1")
         # Disable RA accept (stateless address autoconfiguration)
-        self.cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.accept_ra=0")
         # Force Linux to keep all IPv6 addresses on an interface down event
-        self.cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
         # Iterate over the interfaces
         for intf in self.intfs.values():
             # Enable IPv6 forwarding
-            self.cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
             # Enable IPv4 forwarding
-            self.cmd("sysctl -w net.ipv4.conf.%s.forwarding=1" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv4.conf.%s.forwarding=1" % intf.name)
             # Disable Reverse Path Forwarding filter
-            self.cmd("sysctl -w net.ipv4.conf.%s.rp_filter=0" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv4.conf.%s.rp_filter=0" % intf.name)
             # Enable SRv6 on the interface
-            self.cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
             # Disable RA accept (stateless address autoconfiguration)
-            self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=0")
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.accept_ra=0" % intf.name)
             # Force Linux to keep all IPv6 addresses on an interface down event
-            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1")
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1" % intf.name)
         # Zebra and Quagga config
         if len(self.nets) > 0:
             if kwargs.get('use_ipv4_addressing', False):
@@ -176,7 +181,7 @@ class SRv6Router(Host):
                     self.start_ospf6d(**kwargs)
         # Start gRPC server
         if SOUTHBOUND_INTERFACE == 'GRPC':
-            self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
+            self.exec_cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
 
 
     # Configure and start zebra for IPv6 emulation
@@ -219,12 +224,12 @@ class SRv6Router(Host):
                 zebra.write("ipv6 route %s %s\n"  % ('::/0', default_via))
             zebra.close()
             # Right permission and owners
-            self.cmd("chown quagga %s/*.conf" % self.dir)
-            self.cmd("chown quagga %s/." % self.dir)
-            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/." % self.dir)
+            self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
             self.start_time_zebra = datetime.now().replace(microsecond=0)
             # Start daemons
-            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+            self.exec_cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                      "%s/zebra.pid" % (self.dir, self.dir, self.dir))
 
 
@@ -298,9 +303,9 @@ class SRv6Router(Host):
             ospfd.write("!\n")
             ospfd.close()
             # Right permission and owners
-            self.cmd("chown quagga %s/*.conf" % self.dir)
-            self.cmd("chown quagga %s/." % self.dir)
-            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/." % self.dir)
+            self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
@@ -335,7 +340,7 @@ class SRv6Router(Host):
                 # Zebra daemon is not ready, wait a few milliseconds and retry
                 time.sleep(.003)
                 print("log not ready")
-            self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
+            self.exec_cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
 
     # Configure and start zebra for IPv4 emulation
@@ -372,12 +377,12 @@ class SRv6Router(Host):
                 zebra.write("ip route %s %s\n"  % ('0.0.0.0/0', default_via))
             zebra.close()
             # Right permission and owners
-            self.cmd("chown quagga %s/*.conf" % self.dir)
-            self.cmd("chown quagga %s/." % self.dir)
-            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/." % self.dir)
+            self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
             self.start_time_zebra = datetime.now().replace(microsecond=0)
             # Start daemons
-            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+            self.exec_cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                           "%s/zebra.pid" % (self.dir, self.dir, self.dir))
 
 
@@ -459,9 +464,9 @@ class SRv6Router(Host):
             ospfd.write("!\n")
             ospfd.close()
             # Right permission and owners
-            self.cmd("chown quagga %s/*.conf" % self.dir)
-            self.cmd("chown quagga %s/." % self.dir)
-            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/*.conf" % self.dir)
+            self.exec_cmd("chown quagga %s/." % self.dir)
+            self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
@@ -495,7 +500,7 @@ class SRv6Router(Host):
                     break
                 # Zebra daemon is not ready, wait a few milliseconds and retry
                 time.sleep(.003)
-            self.cmdPrint("ospfd -f %s/ospfd.conf -d -z %s/zebra.sock -i "
+            self.exec_cmd("ospfd -f %s/ospfd.conf -d -z %s/zebra.sock -i "
                      "%s/ospfd.pid" % (self.dir, self.dir, self.dir))
 
     # Clean up the environment
@@ -520,6 +525,10 @@ class MHost(Host):
             shutil.rmtree(self.dir)
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
+        if kwargs.get('debug', False):
+            self.exec_cmd = self.cmdPrint
+        else:
+            self.exec_cmd = self.cmd
 
     # Config hook
     def config(self, **kwargs):
@@ -529,43 +538,43 @@ class MHost(Host):
         # Iterate over the interfaces
         for intf in self.intfs.values():
             # Remove any configured address
-            self.cmd('ip a flush dev %s scope global' % intf.name)
+            self.exec_cmd('ip a flush dev %s scope global' % intf.name)
             # For the first one, let's configure the mgmt address
             if intf.name == kwargs.get('mgmtintf'):
-                self.cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
+                self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
-        self.cmd("echo '" + self.name + "' > /var/mininet/hostname")
+        self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
         # Retrieve nets
         if kwargs.get('nets', None):
             self.nets = kwargs['nets']
         # If requested
         if kwargs['sshd']:
             # Let's start sshd daemon in the hosts
-            self.cmd('/usr/sbin/sshd -D &')
+            self.exec_cmd('/usr/sbin/sshd -D &')
         # Disable IPv6 address autoconfiguration
-        self.cmd('sysctl -w net.ipv6.conf.all.autoconf=0')
+        self.exec_cmd('sysctl -w net.ipv6.conf.all.autoconf=0')
         # Enable RA accept (stateless address autoconfiguration)
-        self.cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
+        self.exec_cmd('sysctl -w net.ipv6.conf.all.accept_ra=1')
         # Force Linux to keep all IPv6 addresses on an interface down event
-        self.cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.keep_addr_on_down=1")
         # Iterate over the interfaces
         for intf in self.intfs.values():
             # Disable IPv6 address autoconfiguration on the interface
             # The addresses are configured by this script
-            self.cmd("sysctl -w net.ipv6.conf.%s.autoconf=0" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.autoconf=0" % intf.name)
             # Accept Router Advertisements messages
             # Used to set a default via in the routing tables
-            self.cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" % intf.name)
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.accept_ra=1" % intf.name)
             # Force Linux to keep all IPv6 addresses on an interface down event
-            self.cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1"
-                     % intf.name)
+            self.exec_cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1"
+                          % intf.name)
         for net in self.nets:
             # Set the address
-            self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
+            self.exec_cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
         # Configure the default via
         default_via = kwargs.get('default_via', None)
         if default_via is not None:
-            self.cmdPrint('ip r a default via %s' % default_via)
+            self.exec_cmd('ip r a default via %s' % default_via)
 
 
 # Abstraction to model a SRv6Controller
@@ -578,19 +587,19 @@ class SRv6Controller(MHost):
         # Configure the default via
         default_via = kwargs.get('default_via')
         if default_via is not None:
-            self.cmd('ip route add default via %s' % default_via)
+            self.exec_cmd('ip route add default via %s' % default_via)
         # Configure the loopback address
         if kwargs.get('loopbackip', None):
-            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
             self.nets.append({
               'intf': 'lo',
               'ip': kwargs['loopbackip'],
               'net': kwargs['loopbackip']})
         # Start the controller
         if kwargs.get('in_band') is True:
-            self.cmd("%s %s --in-band &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
+            self.exec_cmd("%s %s --in-band &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
         else:
-            self.cmd("%s %s &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
+            self.exec_cmd("%s %s &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
 
 
 # Abstraction to model a SRv6Firewall
@@ -605,21 +614,21 @@ class WANRouter(MHost):
             pass
         '''
         if firewall_type == 'stateless':
-            #self.cmd("bash /home/user/repos/firewall/stateless_firewall.sh")
-            self.cmd("bash scripts/stateless_firewall.sh")
+            #self.exec_cmd("bash /home/user/repos/firewall/stateless_firewall.sh")
+            self.exec_cmd("bash scripts/stateless_firewall.sh")
         elif firewall_type == 'stateful':
-            #self.cmd("bash /home/user/repos/firewall/stateful_firewall.sh")
-            self.cmd("bash scripts/stateful_firewall.sh")
+            #self.exec_cmd("bash /home/user/repos/firewall/stateful_firewall.sh")
+            self.exec_cmd("bash scripts/stateful_firewall.sh")
         else:
             print('ERROR')
         '''
         # Enable IPv6 forwarding
-        self.cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
+        self.exec_cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
         # Enable IPv4 forwarding
-        self.cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
+        self.exec_cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
         # Configure the loopback address
         if kwargs.get('loopbackip', None):
-            self.cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
             self.nets.append({
               'intf': 'lo',
               'ip': kwargs['loopbackip'],
@@ -629,8 +638,8 @@ class WANRouter(MHost):
             for route in kwargs['routes']:
                 dest = route['dest']
                 via = route['via']
-                self.cmd("ip route add %s via %s\n"  % (dest, via))
+                self.exec_cmd("ip route add %s via %s\n"  % (dest, via))
         # Configure the default via
         default_via = kwargs.get('default_via')
         if default_via is not None:
-            self.cmd('ip route add default via %s' % default_via)
+            self.exec_cmd('ip route add default via %s' % default_via)

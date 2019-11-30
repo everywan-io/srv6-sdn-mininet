@@ -26,6 +26,8 @@
 # @author Alessandro Masci <mascialessandro89@gmail.com>
 
 
+from __future__ import print_function
+
 # General imports
 from optparse import OptionParser
 import os
@@ -69,12 +71,13 @@ class SRv6Topo(Topo):
     # Init of the topology
     def __init__(self, topo="", out_of_band_controller=False,
                  wan_router_private_addr=False, wan_router_script=None,
-                 use_ipv4_addressing=False, **opts):
+                 use_ipv4_addressing=False, debug=False, **opts):
         # Arguments
         self.out_of_band_controller = out_of_band_controller
         self.wan_router_private_addr = wan_router_private_addr
         self.wan_router_script = wan_router_script
         self.use_ipv4_addressing = use_ipv4_addressing
+        self.debug = debug
         # Parse topology from json file
         parser = SRv6TopoParser(topo, verbose=False)
         parser.parse_data()
@@ -249,7 +252,7 @@ class SRv6Topo(Topo):
             self.addHost(name=router, cls=SRv6Router, sshd=True,
                          loopbackip=loopbackip, routerid=routerid,
                          routernet=routernet, use_ipv4_addressing=self.use_ipv4_addressing,
-                         nets=[], routes=[], enable_ospf=enable_ospf)
+                         nets=[], routes=[], enable_ospf=enable_ospf, debug=self.debug)
             # Save mapping node to mgmt
             #nodes_to_mgmt[router] = str(mgmtIP)
             # Save mapping node to loopbackip
@@ -272,7 +275,7 @@ class SRv6Topo(Topo):
             if is_controller:
                 # Add the controller to the topology
                 self.addHost(name=host, cls=SRv6Controller, sshd=True, in_band=True,
-                             loopbackip=loopbackip, nets=[], routes=[])
+                             loopbackip=loopbackip, nets=[], routes=[], debug=self.debug)
                 # Add node to the topology graph
                 topology.add_node(host, loopbackip=loopbackip, type="controller")
                 # Save controller loopback IP
@@ -285,37 +288,37 @@ class SRv6Topo(Topo):
                 # Add the WAN router to the topology
                 self.addHost(name=host, cls=WANRouter, sshd=True,
                              wan_router_script=self.wan_router_script,
-                             loopbackip=loopbackip, nets=[], routes=[])
+                             loopbackip=loopbackip, nets=[], routes=[], debug=self.debug)
                 # Add node to the topology graph
                 topology.add_node(host, loopbackip=loopbackip, type="controller")
             else:
                 # Add the host to the topology
                 self.addHost(name=host, cls=MHost, sshd=True,
-                             loopbackip=loopbackip, nets=[])
+                             loopbackip=loopbackip, nets=[], debug=self.debug)
                 # Add node to the topology graph
                 topology.add_node(host, loopbackip=loopbackip, type="host")
         # Configure the controller and the WAN router
         if self.out_of_band_controller:
             if self.use_ipv4_addressing:
-                nets = IPv4Network('172.0.0.0/16'.decode())
+                nets = IPv4Network(u'172.0.0.0/16')
                 nets = nets.subnets(new_prefix=30)
                 controller_loopbackip = None
             else:
-                nets = IPv6Network('2000::/16'.decode())
+                nets = IPv6Network(u'2000::/16')
                 nets = nets.subnets(new_prefix=64)
-                controller_loopbackip = 'fcff::1/32'
+                controller_loopbackip = u'fcff::1/32'
             # Add the controller to the topology
             self.controller = 'controller'
             self.addHost(name=self.controller, cls=SRv6Controller, sshd=False,
-                         inNamespace=False, in_band=False, nets=[])
+                         inNamespace=False, in_band=False, nets=[], debug=self.debug)
             # Add the WAN router to the topology
             self.wan_router = 'wanrouter'
             # Assign a data-plane net to this link
             if self.wan_router_private_addr:
                 if self.use_ipv4_addressing:
-                    net = IPv4Network('172.0.0.0/16'.decode())
+                    net = IPv4Network(u'172.0.0.0/16')
                 else:
-                    net = IPv6Network('2002::/16'.decode())
+                    net = IPv6Network(u'2002::/16')
                 hosts = net.hosts()
                 # Get lhs ip
                 lhsip = next(hosts).__str__()
@@ -458,7 +461,7 @@ class SRv6Topo(Topo):
                 prefix = edge_link_properties['prefix']
                 net = net.__str__()
                 if self.wan_router_private_addr:
-                    net = IPv6Network('fcfa::/16'.decode())
+                    net = IPv6Network(u'fcfa::/16')
                     hosts = net.hosts()
                     # Get lhs ip
                     lhsip = next(hosts).__str__()
@@ -571,6 +574,7 @@ def stopAll():
 # Utility function to deploy Mininet topology
 def deploy(options):
     # Retrieves options
+    debug = options.debug
     topologyFile = options.topology
     clean_all = options.clean_all
     no_cli = options.no_cli
@@ -588,7 +592,8 @@ def deploy(options):
     topo = SRv6Topo(topo=topologyFile,
                     out_of_band_controller=out_of_band_controller,
                     wan_router_private_addr=wan_router_private_addr,
-                    use_ipv4_addressing=ipv4_addressing)
+                    use_ipv4_addressing=ipv4_addressing,
+                    debug=debug)
     # Create Mininet net
     net = Mininet(topo=topo, link=TCLink, build=False, controller=None)
     # Build topology
@@ -610,6 +615,9 @@ def deploy(options):
 # Parse command line options and dump results
 def parseOptions():
     parser = OptionParser()
+    # Debug mode
+    parser.add_option('-d', '--debug', dest='debug', action='store_true',
+                      default=False, help='Enable debug mode')
     # Topology json file
     parser.add_option('--topology', dest='topology', type='string',
                       default="example_srv6_topology.json",
