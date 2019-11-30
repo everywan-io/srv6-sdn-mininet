@@ -78,11 +78,22 @@ class SRv6Topo(Topo):
         # Parse topology from json file
         parser = SRv6TopoParser(topo, verbose=False)
         parser.parse_data()
+        # Stub links
+        self.stub_links = list()
+        # Private links
+        self.private_links = list()
         # Save parsed data
         self.routers = parser.getRouters()
         p_routers_properties = parser.getRoutersProperties()
         self._hosts = parser.getHosts()
         p_hosts_properties = parser.getHostsProperties()
+        # Identify ospf routers and default routes
+        self.ospf_routers = list()
+        self.default_vias = dict()
+        for router, p_router_properties in zip(self.routers, p_routers_properties):
+            if p_router_properties.get('enable_ospf', False):
+                self.ospf_routers.append(router)
+            self.default_vias[router] = p_router_properties.get('default_via', None)
         # Identify the controller
         self.controller = None
         for host, p_host_properties in zip(self._hosts, p_hosts_properties):
@@ -91,6 +102,7 @@ class SRv6Topo(Topo):
                     error('Error: Multi-controller topologies are not supported')
                     exit(-1)
                 self.controller = host
+            self.default_vias[host] = p_host_properties.get('default_via', None)
         # Add the WAN router to the hosts
         self.wan_router = 'wanrouter'
         self._hosts.append(self.wan_router)
@@ -145,6 +157,10 @@ class SRv6Topo(Topo):
             elif type == 'access':
                 core_links_properties.append(generator
                                              .getAccessLinksProperties([core_link]))
+            if p_core_link_properties.get('is_stub', False):
+                self.stub_links.append(core_link)
+            if p_core_link_properties.get('is_private', False):
+                self.private_links.append(core_link)
         for (core_link_properties,
              p_core_link_properties) in zip(core_links_properties,
                                             p_core_links_properties):
@@ -174,6 +190,12 @@ class SRv6Topo(Topo):
                 elif type == 'access':
                     edge_links_properties.append(generator
                                                  .getAccessLinksProperties([edge_link]))
+            # Stub links identification
+            if p_edge_link_properties.get('is_stub', False):
+                self.stub_links.append(edge_link)
+            # Private links identification
+            if p_edge_link_properties.get('is_private', False):
+                self.private_links.append(edge_link)
         for (edge_link_properties,
              p_edge_link_properties) in zip(edge_links_properties,
                                             p_edge_links_properties):
@@ -182,20 +204,22 @@ class SRv6Topo(Topo):
             p_edge_link_properties['net'] = edge_link_properties[0].net
             p_edge_link_properties['prefix'] = edge_link_properties[0].prefix
         self.edge_links_properties = p_edge_links_properties
-        # Stub links identification
-        self.stub_links = list()
+        '''
         for (edge_link,
              p_edge_link_properties) in zip(self.edge_links,
                                             p_edge_links_properties):
             edge_link = (edge_link[0], edge_link[1])
             if p_edge_link_properties.get('is_stub', False):
                 self.stub_links.append(edge_link)
+            if p_edge_link_properties.get('is_private', False):
+                self.private_links.append(edge_link)
         for (core_link,
              p_core_link_properties) in zip(self.core_links,
                                             p_core_links_properties):
             core_link = (core_link[0], core_link[1])
-            if p_core_link_properties.get('is_stub', False):
-                self.stub_links.append(core_link)
+            if p_core_link_properties.get('is_private', False):
+                self.private_links.append(core_link)
+        '''
         # Init steps
         Topo.__init__(self, **opts)
 
@@ -219,11 +243,13 @@ class SRv6Topo(Topo):
             else:
                 loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
             #mgmtip = "%s/%s" % (mgmtIP, IPv6MgmtAllocator.prefix)
+            # Enable ospfd?
+            enable_ospf = router in self.ospf_routers
             # Add the router to the topology
             self.addHost(name=router, cls=SRv6Router, sshd=True,
                          loopbackip=loopbackip, routerid=routerid,
                          routernet=routernet, use_ipv4_addressing=self.use_ipv4_addressing,
-                         nets=[], routes=[])
+                         nets=[], routes=[], enable_ospf=enable_ospf)
             # Save mapping node to mgmt
             #nodes_to_mgmt[router] = str(mgmtIP)
             # Save mapping node to loopbackip
@@ -319,8 +345,8 @@ class SRv6Topo(Topo):
             # Save net
             lhsip = '%s/%s' % (lhsip, self.netprefix)
             rhsip = '%s/%s' % (rhsip, self.netprefix)
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
             self.nodeInfo(self.controller)['nets'].append(lhsnet)
             self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
             # Connect all the routers to the management network
@@ -347,8 +373,8 @@ class SRv6Topo(Topo):
                 # Save net
                 lhsip = '%s/%s' % (lhsip, self.netprefix)
                 rhsip = '%s/%s' % (rhsip, self.netprefix)
-                lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False}
-                rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False}
+                lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
+                rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
                 self.nodeInfo(router)['nets'].append(lhsnet)
                 self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
         # Iterate over the core links and generate them
@@ -386,11 +412,19 @@ class SRv6Topo(Topo):
             # Configure the cost of the nets
             cost = core_link_properties.get('cost')
             is_stub = (lhs, rhs) in self.stub_links
+            is_private = (lhs, rhs) in self.private_links
             # Save net
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub, 'is_private': is_private}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': core_link_properties['bw'], 'stub': is_stub, 'is_private': is_private}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
+            # Default via
+            default_via = self.default_vias.get(lhs, None)
+            if default_via is not None and default_via == rhs:
+                self.nodeInfo(lhs)['default_via'] = core_link_properties['iprhs']
+            default_via = self.default_vias.get(rhs, None)
+            if default_via is not None and default_via == lhs:
+                self.nodeInfo(rhs)['default_via'] = core_link_properties['iplhs']
         # Iterate over the edge links and generate them
         for edge_link, edge_link_properties in zip(self.edge_links,
                                                    self.edge_links_properties):
@@ -470,10 +504,17 @@ class SRv6Topo(Topo):
             # Mark the nets as stub in order to set them
             # as passive interfaces in the OSPF configuration
             is_stub = (lhs, rhs) in self.stub_links
-            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub}
-            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub}
+            lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub, 'is_private': is_private}
+            rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'cost': cost, 'bw': edge_link_properties['bw'], 'stub': is_stub, 'is_private': is_private}
             self.nodeInfo(lhs)['nets'].append(lhsnet)
             self.nodeInfo(rhs)['nets'].append(rhsnet)
+            # Default via
+            default_via = self.default_vias.get(lhs, None)
+            if default_via is not None and default_via == rhs:
+                self.nodeInfo(lhs)['default_via'] = edge_link_properties['iprhs']
+            default_via = self.default_vias.get(rhs, None)
+            if default_via is not None and default_via == lhs:
+                self.nodeInfo(rhs)['default_via'] = edge_link_properties['iplhs']
         # Add routes to reach the controller to the routers
         for router in self.vias:
             if self.controller_loopbackip is not None:
@@ -522,7 +563,7 @@ def stopAll():
     # Clean Mininet emulation environment
     os.system('sudo mn -c')
     # Kill all the started daemons
-    os.system('sudo killall sshd zebra ospf6d')
+    os.system('sudo killall sshd zebra ospf6d ospfd')
     # Restart root ssh daemon
     os.system('service sshd restart')
 

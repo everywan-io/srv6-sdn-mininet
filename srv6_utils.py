@@ -167,22 +167,23 @@ class SRv6Router(Host):
         # Zebra and Quagga config
         if len(self.nets) > 0:
             if kwargs.get('use_ipv4_addressing', False):
-                self.start_quagga_ipv4(**kwargs)
+                self.start_zebra_ipv4(**kwargs)
+                if kwargs.get('enable_ospf', False):
+                    self.start_ospfd(**kwargs)
             else:
-                self.start_quagga_ipv6(**kwargs)
+                self.start_zebra_ipv6(**kwargs)
+                if kwargs.get('enable_ospf', False):
+                    self.start_ospf6d(**kwargs)
         # Start gRPC server
         if SOUTHBOUND_INTERFACE == 'GRPC':
             self.cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
 
-    # Configure and start zebra and ospf6d for IPv6 emulation
-    def start_quagga_ipv6(self, **kwargs):
+
+    # Configure and start zebra for IPv6 emulation
+    def start_zebra_ipv6(self, **kwargs):
         # Zebra and Quagga config
         if len(self.nets) > 0:
             zebra = open("%s/zebra.conf" % self.dir, 'w')
-            ospfd = open("%s/ospf6d.conf" % self.dir, 'w')
-            ospfd.write("! -*- ospf6 -*-\n!\nhostname %s\n" % self.name)
-            ospfd.write("password srv6\nlog file %s/ospf6d.log\n!\n" %
-                        self.dir)
             zebra.write("! -*- zebra -*-\n!\nhostname %s\n" %
                         self.name)
             zebra.write("password srv6\nenable password srv6\n"
@@ -193,8 +194,6 @@ class SRv6Router(Host):
                 zebra.write("ipv6 route %s lo\n!\n" % routernet)
             # Iterate over the nets and build interface part of the configs
             for net in self.nets:
-                # Link cost for the interface
-                cost = net.get('cost', None)
                 # Non-loopback interface
                 if net['intf'] != 'lo':
                     # Set the IPv6 address and the network
@@ -208,6 +207,41 @@ class SRv6Router(Host):
                                 "ipv6 nd prefix %s\n!\n"
                                 % (net['intf'], net['bw']*1000, RA_INTERVAL,
                                    net['ip'], net['net']))
+            # Configure the routes
+            if kwargs.get('routes', None):
+                for route in kwargs['routes']:
+                    dest = route['dest']
+                    via = route['via']
+                    zebra.write("ipv6 route %s %s\n"  % (dest, via))
+            # Configure the default via
+            default_via = kwargs.get('default_via', None)
+            if default_via is not None:
+                zebra.write("ipv6 route %s %s\n"  % ('::/0', default_via))
+            zebra.close()
+            # Right permission and owners
+            self.cmd("chown quagga %s/*.conf" % self.dir)
+            self.cmd("chown quagga %s/." % self.dir)
+            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.start_time_zebra = datetime.now().replace(microsecond=0)
+            # Start daemons
+            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+                     "%s/zebra.pid" % (self.dir, self.dir, self.dir))
+
+
+    # Configure and start ospf6d for IPv6 emulation
+    def start_ospf6d(self, **kwargs):
+        # Zebra and Quagga config
+        if len(self.nets) > 0:
+            ospfd = open("%s/ospf6d.conf" % self.dir, 'w')
+            ospfd.write("! -*- ospf6 -*-\n!\nhostname %s\n" % self.name)
+            ospfd.write("password srv6\nlog file %s/ospf6d.log\n!\n" %
+                        self.dir)
+            # Iterate over the nets and build interface part of the configs
+            for net in self.nets:
+                # Link cost for the interface
+                cost = net.get('cost', None)
+                # Non-loopback interface
+                if net['intf'] != 'lo':
                     if net['stub']:
                         # Stub network
                         # Set OSPF6 parameters and mark the network as
@@ -249,12 +283,6 @@ class SRv6Router(Host):
                                         "ipv6 ospf6 retransmit-interval %s\n!\n"
                                         % (net['intf'], HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
-            # Configure the routes
-            if kwargs.get('routes', None):
-                for route in kwargs['routes']:
-                    dest = route['dest']
-                    via = route['via']
-                    zebra.write("ipv6 route %s %s\n"  % (dest, via))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -263,18 +291,16 @@ class SRv6Router(Host):
             ospfd.write("area 0.0.0.0 range %s\n" % RANGE_FOR_AREA_0)
             # Iterate again over the nets to finish area part
             for net in self.nets:
-                ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
+                if net.get('is_private', False):
+                    ospfd.write("no interface %s area 0.0.0.0\n" % (net['intf']))
+                else:
+                    ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
             ospfd.close()
-            zebra.close()
             # Right permission and owners
             self.cmd("chown quagga %s/*.conf" % self.dir)
             self.cmd("chown quagga %s/." % self.dir)
             self.cmd("chmod 640 %s/*.conf" % self.dir)
-            start_time = datetime.now().replace(microsecond=0)
-            # Start daemons
-            self.cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
-                     "%s/zebra.pid" % (self.dir, self.dir, self.dir))
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
@@ -298,7 +324,7 @@ class SRv6Router(Host):
                                                            '%Y/%m/%d %H:%M:%S'))
                                 # Check the entry timestamp to check if
                                 # it isn't an old entry
-                                if logentry_time >= start_time:
+                                if logentry_time >= self.start_time_zebra:
                                     ready = True
                                     break
                             except ValueError:
@@ -308,18 +334,15 @@ class SRv6Router(Host):
                     break
                 # Zebra daemon is not ready, wait a few milliseconds and retry
                 time.sleep(.003)
+                print("log not ready")
             self.cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
                      "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
 
-    # Configure and start zebra and ospf6d for IPv6 emulation
-    def start_quagga_ipv4(self, **kwargs):
+    # Configure and start zebra for IPv4 emulation
+    def start_zebra_ipv4(self, **kwargs):
         # Zebra and Quagga config
         if len(self.nets) > 0:
             zebra = open("%s/zebra.conf" % self.dir, 'w')
-            ospfd = open("%s/ospfd.conf" % self.dir, 'w')
-            ospfd.write("! -*- ospf -*-\n!\nhostname %s\n" % self.name)
-            ospfd.write("password srv6\nlog file %s/ospfd.log\n!\n" %
-                        self.dir)
             zebra.write("! -*- zebra -*-\n!\nhostname %s\n" %
                         self.name)
             zebra.write("password srv6\nenable password srv6\n"
@@ -337,6 +360,43 @@ class SRv6Router(Host):
                                 "bandwidth %s\n"
                                 "ip address %s\n!\n"
                                 % (net['intf'], net['bw']*1000, net['ip']))
+            # Configure the routes
+            if kwargs.get('routes', None):
+                for route in kwargs['routes']:
+                    dest = route['dest']
+                    via = route['via']
+                    zebra.write("ip route %s %s\n"  % (dest, via))
+            # Configure the default via
+            default_via = kwargs.get('default_via', None)
+            if default_via is not None:
+                zebra.write("ip route %s %s\n"  % ('0.0.0.0/0', default_via))
+            zebra.close()
+            # Right permission and owners
+            self.cmd("chown quagga %s/*.conf" % self.dir)
+            self.cmd("chown quagga %s/." % self.dir)
+            self.cmd("chmod 640 %s/*.conf" % self.dir)
+            self.start_time_zebra = datetime.now().replace(microsecond=0)
+            # Start daemons
+            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
+                          "%s/zebra.pid" % (self.dir, self.dir, self.dir))
+
+
+    # Configure and start ospfd for IPv4 emulation
+    def start_ospfd(self, **kwargs):
+        # Zebra and Quagga config
+        if len(self.nets) > 0:
+            ospfd = open("%s/ospfd.conf" % self.dir, 'w')
+            ospfd.write("! -*- ospf -*-\n!\nhostname %s\n" % self.name)
+            ospfd.write("password srv6\nlog file %s/ospfd.log\n!\n" %
+                        self.dir)
+            # Iterate over the nets and build interface part of the configs
+            for net in self.nets:
+                # Link cost for the interface
+                cost = net.get('cost', None)
+                # Non-loopback interface
+                if net['intf'] != 'lo':
+                    # Check if the interface is private
+                    enable_ospf = 'no ' if net.get('is_private', False) else ''
                     if net['stub']:
                         # Stub network
                         # Set OSPF6 parameters and mark the network as
@@ -345,49 +405,43 @@ class SRv6Router(Host):
                         if cost is not None:
                             ospfd.write("interface %s\n"
                                         #"ip ospf passive\n"
-                                        "ip ospf area 0.0.0.0\n"
+                                        "%sip ospf area 0.0.0.0\n"
                                         "ip ospf cost %s\n"
                                         "ip ospf hello-interval %s\n"
                                         "ip ospf dead-interval %s\n"
                                         "ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                        % (net['intf'], enable_ospf, cost, HELLO_INTERVAL,
                                             DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                         else:
                             ospfd.write("interface %s\n"
                                         #"ip ospf passive\n"
-                                        "ip ospf area 0.0.0.0\n"
+                                        "%sip ospf area 0.0.0.0\n"
                                         "ip ospf hello-interval %s\n"
                                         "ip ospf dead-interval %s\n"
                                         "ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], HELLO_INTERVAL,
+                                        % (net['intf'], enable_ospf, HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                     else:
                         # Transit network
                         if cost is not None:
                             ospfd.write("interface %s\n"
                                         #"no ip ospf passive\n"
-                                        "ip ospf area 0.0.0.0\n"
+                                        "%sip ospf area 0.0.0.0\n"
                                         "ip ospf cost %s\n"
                                         "ip ospf hello-interval %s\n"
                                         "ip ospf dead-interval %s\n"
                                         "ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], cost, HELLO_INTERVAL,
+                                        % (net['intf'], enable_ospf, cost, HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                         else:
                             ospfd.write("interface %s\n"
                                         #"no ip ospf passive\n"
-                                        "ip ospf area 0.0.0.0\n"
+                                        "%sip ospf area 0.0.0.0\n"
                                         "ip ospf hello-interval %s\n"
                                         "ip ospf dead-interval %s\n"
                                         "ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], HELLO_INTERVAL,
+                                        % (net['intf'], enable_ospf, HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
-            # Configure the routes
-            if kwargs.get('routes', None):
-                for route in kwargs['routes']:
-                    dest = route['dest']
-                    via = route['via']
-                    zebra.write("ip route %s %s\n"  % (dest, via))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -404,15 +458,10 @@ class SRv6Router(Host):
             #    ospfd.write("interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
             ospfd.close()
-            zebra.close()
             # Right permission and owners
             self.cmd("chown quagga %s/*.conf" % self.dir)
             self.cmd("chown quagga %s/." % self.dir)
             self.cmd("chmod 640 %s/*.conf" % self.dir)
-            start_time = datetime.now().replace(microsecond=0)
-            # Start daemons
-            self.cmdPrint("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
-                          "%s/zebra.pid" % (self.dir, self.dir, self.dir))
             while not os.path.exists("%s/zebra.log" % self.dir):
                 # Zebra daemon is not ready, wait a few milliseconds
                 print("log not ready")
@@ -436,7 +485,7 @@ class SRv6Router(Host):
                                                            '%Y/%m/%d %H:%M:%S'))
                                 # Check the entry timestamp to check if
                                 # it isn't an old entry
-                                if logentry_time >= start_time:
+                                if logentry_time >= self.start_time_zebra:
                                     ready = True
                                     break
                             except ValueError:
@@ -513,6 +562,10 @@ class MHost(Host):
         for net in self.nets:
             # Set the address
             self.cmd('ip a a %s dev %s' % (net['ip'], net['intf']))
+        # Configure the default via
+        default_via = kwargs.get('default_via', None)
+        if default_via is not None:
+            self.cmdPrint('ip r a default via %s' % default_via)
 
 
 # Abstraction to model a SRv6Controller
