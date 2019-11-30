@@ -294,7 +294,8 @@ class SRv6Topo(Topo):
             else:
                 # Add the host to the topology
                 self.addHost(name=host, cls=MHost, sshd=True,
-                             loopbackip=loopbackip, nets=[], debug=self.debug)
+                             loopbackip=loopbackip, nets=[], routes=[],
+                             debug=self.debug)
                 # Add node to the topology graph
                 topology.add_node(host, loopbackip=loopbackip, type="host")
         # Configure the controller and the WAN router
@@ -379,6 +380,40 @@ class SRv6Topo(Topo):
                 lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
                 rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
                 self.nodeInfo(router)['nets'].append(lhsnet)
+                self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
+            # Connect all the hosts to the management network
+            for host in self._hosts:
+                if host == self.wan_router:
+                    # Skip
+                    continue
+                if host == self.controller:
+                    # Skip
+                    continue
+                # Assign a data-plane net to this link
+                net = next(nets)
+                hosts = net.hosts()
+                # Get lhs ip
+                lhsip = next(hosts).__str__()
+                # Get rhs ip
+                rhsip = next(hosts).__str__()
+                # Create a link between the WAN router and the router
+                self.addLink(host, self.wan_router, bw=1000, delay=0)
+                # Get Port number
+                portNumber = self.port(host, self.wan_router)
+                # Create lhs_intf
+                lhsintf = "%s-eth%d" % (host, portNumber[0])
+                # Create rhs_intf
+                rhsintf = "%s-eth%d" % (self.wan_router, portNumber[1])
+                # Add the route to the router
+                if controller_loopbackip is not None:
+                    self.nodeInfo(host)['routes'].append({'dest': controller_loopbackip, 'via': rhsip})
+                self.nodeInfo(host)['routes'].append({'dest': controller_wan_router_net, 'via': rhsip})
+                # Save net
+                lhsip = '%s/%s' % (lhsip, self.netprefix)
+                rhsip = '%s/%s' % (rhsip, self.netprefix)
+                lhsnet = {'intf': lhsintf, 'ip': lhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
+                rhsnet = {'intf': rhsintf, 'ip': rhsip, 'net': net, 'bw': 1000, 'stub': False, 'is_private': True}
+                self.nodeInfo(host)['nets'].append(lhsnet)
                 self.nodeInfo(self.wan_router)['nets'].append(rhsnet)
         # Iterate over the core links and generate them
         for core_link, core_link_properties in zip(self.core_links,

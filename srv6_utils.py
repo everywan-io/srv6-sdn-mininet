@@ -319,8 +319,8 @@ class SRv6Router(Host):
                     # Process log entries
                     for line in log_file:
                         # Find 'zebra starting' entry
-                        m = re.search('(\d*.\d*.\d* \d*.\d*.\d*) ZEBRA: '
-                                      'Zebra (\S+) starting: (\S+)', line)
+                        m = re.search('(\\d*.\\d*.\\d* \\d*.\\d*.\\d*) ZEBRA: '
+                                      'Zebra (\\S+) starting: (\\S+)', line)
                         if(m):
                             try:
                                 # 'Zebra starting' entry found
@@ -354,8 +354,6 @@ class SRv6Router(Host):
                         "log file %s/zebra.log\n!\n" % self.dir)
             # Iterate over the nets and build interface part of the configs
             for net in self.nets:
-                # Link cost for the interface
-                cost = net.get('cost', None)
                 # Non-loopback interface
                 if net['intf'] != 'lo':
                     # Set the IPv6 address and the network
@@ -480,8 +478,8 @@ class SRv6Router(Host):
                     # Process log entries
                     for line in log_file:
                         # Find 'zebra starting' entry
-                        m = re.search('(\d*.\d*.\d* \d*.\d*.\d*) ZEBRA: '
-                                      'Zebra (\S+) starting: (\S+)', line)
+                        m = re.search('(\\d*.\\d*.\\d* \\d*.\\d*.\\d*) ZEBRA: '
+                                      'Zebra (\\S+) starting: (\\S+)', line)
                         if(m):
                             try:
                                 # 'Zebra starting' entry found
@@ -575,6 +573,12 @@ class MHost(Host):
         default_via = kwargs.get('default_via', None)
         if default_via is not None:
             self.exec_cmd('ip r a default via %s' % default_via)
+        # Configure the routes
+        if kwargs.get('routes', None):
+            for route in kwargs['routes']:
+                dest = route['dest']
+                via = route['via']
+                self.exec_cmd("ip route add %s via %s\n"  % (dest, via))
 
 
 # Abstraction to model a SRv6Controller
@@ -584,10 +588,6 @@ class SRv6Controller(MHost):
     def config(self, **kwargs):
 
         MHost.config(self, **kwargs)
-        # Configure the default via
-        default_via = kwargs.get('default_via')
-        if default_via is not None:
-            self.exec_cmd('ip route add default via %s' % default_via)
         # Configure the loopback address
         if kwargs.get('loopbackip', None):
             self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
@@ -633,13 +633,3 @@ class WANRouter(MHost):
               'intf': 'lo',
               'ip': kwargs['loopbackip'],
               'net': kwargs['loopbackip']})
-        # Configure the routes
-        if kwargs.get('routes', None):
-            for route in kwargs['routes']:
-                dest = route['dest']
-                via = route['via']
-                self.exec_cmd("ip route add %s via %s\n"  % (dest, via))
-        # Configure the default via
-        default_via = kwargs.get('default_via')
-        if default_via is not None:
-            self.exec_cmd('ip route add default via %s' % default_via)
