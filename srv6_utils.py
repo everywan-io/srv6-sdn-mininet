@@ -23,7 +23,7 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 # General imports
 import os
@@ -84,8 +84,9 @@ if SOUTHBOUND_INTERFACE != 'NONE':
               'Supported southbound interfaces: %s' % SUPPORTED_SB_INTERFACES)
         sys.exit(-2)
 # Path of the gRPC southbound server
-SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py'
-                       % DATA_PLANE_FOLDER)
+#SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py'
+#                       % DATA_PLANE_FOLDER)
+SB_GRPC_SERVER_PATH = ('srv6_sdn_data_plane.southbound.grpc.sb_grpc_server')
 # Path of the gRPC southbound server
 SRV6_CONTROLLER_PATH = ('%s/srv6_controller.py --ips fcff:1::1-2606 '
                         '--period 10 --topology /tmp/topo.json '
@@ -181,7 +182,7 @@ class SRv6Router(Host):
                     self.start_ospf6d(**kwargs)
         # Start gRPC server
         if SOUTHBOUND_INTERFACE == 'GRPC':
-            self.exec_cmd("%s %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
+            self.exec_cmd("%s -m %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
 
 
     # Configure and start zebra for IPv6 emulation

@@ -25,6 +25,8 @@
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 # @author Alessandro Masci <mascialessandro89@gmail.com>
 
+from __future__ import absolute_import, division, print_function
+
 from collections import defaultdict
 from mininet.log import info
 
