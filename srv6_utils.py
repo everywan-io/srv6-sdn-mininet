@@ -58,6 +58,10 @@ RA_INTERVAL = 10
 DATA_PLANE_FOLDER = '../srv6-sdn-data-plane'
 # Path to the controler plane folder
 CONTROL_PLANE_FOLDER = '../srv6-sdn-control-plane'
+# Registration required
+REGISTRATION_REQUIRED = True
+# Registration wait
+REGISTRATION_WAIT = 3
 
 ###########################################################
 
@@ -87,11 +91,18 @@ if SOUTHBOUND_INTERFACE != 'NONE':
 #SB_GRPC_SERVER_PATH = ('%s/southbound/grpc/sb_grpc_server.py'
 #                       % DATA_PLANE_FOLDER)
 SB_GRPC_SERVER_PATH = ('srv6_sdn_data_plane.southbound.grpc.sb_grpc_server')
+# Path of the Pymerang client
+PYMERANG_CLIENT_PATH = ('pymerang.pymerang_client')
 # Path of the gRPC southbound server
-SRV6_CONTROLLER_PATH = ('%s/srv6_controller.py --ips fcff:1::1-2606 '
+#SRV6_CONTROLLER_PATH = ('%s/srv6_controller.py --ips fcff:1::1-2606 '
+SRV6_CONTROLLER_PATH = ('%s/srv6_controller.py --ips 2000:0:0::1-2606 '
                         '--period 10 --topology /tmp/topo.json '
-                        '--topo-graph /tmp/topo_graph.svg'
+                        '--topo-graph /tmp/topo_graph.svg '
+                        '--sb-interface gRPC --nb-interface gRPC '
+                        '--grpc-server-ip 2000::1 --grpc-server-port 12345'
                        % CONTROL_PLANE_FOLDER)
+# Path of the NAT discovery server
+NAT_DISCOVERY_SERVER_PATH = 'nat_utils.nat_discovery_server'
 
 # This workaround solves the issue of python commands
 # executed outside the virtual environment
@@ -183,7 +194,9 @@ class SRv6Router(Host):
         # Start gRPC server
         if SOUTHBOUND_INTERFACE == 'GRPC':
             self.exec_cmd("%s -m %s &" % (PYTHON_PATH, SB_GRPC_SERVER_PATH))
-
+        # Register to controller
+        if REGISTRATION_REQUIRED:
+            self.exec_cmd("(sleep %s && %s -m %s -c /tmp/config-%s.json) &" % (REGISTRATION_WAIT, PYTHON_PATH, PYMERANG_CLIENT_PATH, self.name))
 
     # Configure and start zebra for IPv6 emulation
     def start_zebra_ipv6(self, **kwargs):
@@ -601,6 +614,7 @@ class SRv6Controller(MHost):
             self.exec_cmd("%s %s --in-band &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
         else:
             self.exec_cmd("%s %s &" % (PYTHON_PATH, SRV6_CONTROLLER_PATH))
+        self.exec_cmd("%s -m %s &" % (PYTHON_PATH, NAT_DISCOVERY_SERVER_PATH))
 
 
 # Abstraction to model a SRv6Firewall
