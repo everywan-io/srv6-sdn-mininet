@@ -23,6 +23,8 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
+from __future__ import absolute_import, division, print_function
+
 from ipaddress import IPv6Network
 
 # Allocates mgmt address

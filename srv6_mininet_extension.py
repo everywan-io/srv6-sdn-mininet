@@ -26,7 +26,7 @@
 # @author Alessandro Masci <mascialessandro89@gmail.com>
 
 
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 # General imports
 from optparse import OptionParser
@@ -160,6 +160,9 @@ class SRv6Topo(Topo):
             elif type == 'access':
                 core_links_properties.append(generator
                                              .getAccessLinksProperties([core_link]))
+            else:
+                core_links_properties.append(generator
+                                             .getCoreLinksProperties([core_link]))                                            
             if p_core_link_properties.get('is_stub', False):
                 self.stub_links.append(core_link)
             if p_core_link_properties.get('is_private', False):
@@ -193,8 +196,11 @@ class SRv6Topo(Topo):
                 elif type == 'access':
                     edge_links_properties.append(generator
                                                  .getAccessLinksProperties([edge_link]))
+                else:
+                    edge_links_properties.append(generator
+                                                 .getEdgeLinksProperties([edge_link]))
             # Stub links identification
-            if p_edge_link_properties.get('is_stub', False):
+            if p_edge_link_properties.get('is_stub', True):
                 self.stub_links.append(edge_link)
             # Private links identification
             if p_edge_link_properties.get('is_private', False):
