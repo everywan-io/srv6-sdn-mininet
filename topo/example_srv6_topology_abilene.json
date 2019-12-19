@@ -348,7 +348,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 2
         },
@@ -358,7 +358,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 0
         },
@@ -368,7 +368,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 3
         },
@@ -398,7 +398,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 0
         },
@@ -418,7 +418,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 2
         },
@@ -448,7 +448,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 0
         },
@@ -458,7 +458,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 0
         },
@@ -488,7 +488,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 4
         },
@@ -518,7 +518,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 4
         },
@@ -528,7 +528,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 3
         },
@@ -538,7 +538,7 @@
      },
      {
       "info": {
-        "type": "Server",
+        "type": "Host",
         "property": {
           "vnf": 4
         },

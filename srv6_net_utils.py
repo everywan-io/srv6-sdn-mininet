@@ -23,17 +23,17 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
-from ipaddress import IPv6Network, IPv4Network
+from ipaddress import IPv6Network
 
 # Allocates mgmt address
 class MgmtAllocator(object):
 
   bit = 64
-  net = unicode("2000::/%d" % bit)
+  net = u"2000::/%d" % bit
   prefix = 64
 
   def __init__(self): 
-    print "*** Calculating Available Mgmt Addresses"
+    print("*** Calculating Available Mgmt Addresses")
     self.mgmtnet = (IPv6Network(self.net)).hosts()
   
   def nextMgmtAddress(self):
