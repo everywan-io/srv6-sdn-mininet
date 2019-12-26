@@ -384,6 +384,32 @@
            },
            "group": ""
          }
+      },
+      {
+         "source":"controller",
+         "target":"wanrouter",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "mgmt"
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter1",
+         "target":"wanrouter",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "mgmt"
+           },
+           "group": ""
+         }
       }
    ],
    "vertices":[
@@ -461,7 +487,10 @@
       "info": {
         "type": "Router",
         "property": {
-          "default_via": "modem1"
+          "default_via": "modem1",
+          "scripts": [
+            "edge_device.sh controller"
+          ]
         },
         "group": [200]
       },
@@ -471,7 +500,10 @@
       "info": {
         "type": "Router",
         "property": {
-          "default_via": "modem2"
+          "default_via": "modem2",
+          "scripts": [
+            "edge_device.sh controller"
+          ]
         },
         "group": [200]
       },
@@ -481,7 +513,10 @@
       "info": {
         "type": "Router",
         "property": {
-          "default_via": "modem3"
+          "default_via": "modem3",
+          "scripts": [
+            "edge_device.sh controller"
+          ]
         },
         "group": [200]
       },
@@ -491,7 +526,10 @@
       "info": {
         "type": "Router",
         "property": {
-          "default_via": "modem4"
+          "default_via": "modem4",
+          "scripts": [
+            "edge_device.sh controller"
+          ]
         },
         "group": [200]
       },
@@ -656,6 +694,30 @@
         "group": [200]
       },
       "id": "host3ewED4"
+     },
+     {
+      "info": {
+        "type": "Controller",
+        "property": {
+          "outband": false,
+          "scripts": [
+            "nat_discovery_server.sh",
+            "sdwan_controller.sh pRouter1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "controller"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+            "type": "WANRouter"
+        },
+        "group": [200]
+      },
+      "id": "wanrouter"
      }
    ],
    "graph_parameters":{
