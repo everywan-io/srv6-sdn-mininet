@@ -141,6 +141,45 @@ class SRv6Router(Host):
                 self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
         self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
+        # Let's write the hostname
+        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
+        # Let's write the id
+        self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        # Let's write the neighbors
+        if 'neighs' in kwargs:
+            neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
+            with open(neighs_sh, 'w') as outfile:
+                # Create header
+                nodes = "declare -a NEIGHS=("
+                # Iterate over management ips
+                for neigh in kwargs['neighs']:
+                    # Add the nodes one by one
+                    nodes = nodes + "%s " % neigh
+                if kwargs['neighs'] != []:
+                    # Eliminate last character
+                    nodes = nodes[:-1] + ")\n"
+                else:
+                    nodes = nodes + ")\n"
+                # Write on the file
+                outfile.write(nodes)
+        # Let's write the interfaces
+        if 'interfaces' in kwargs:
+            interfaces_sh = '%s/%s' % (self.dir, INTERFACES_SH)
+            with open(interfaces_sh, 'w') as outfile:
+                # Create header
+                nodes = "declare -A INTERFACES=("
+                # Iterate over management ips
+                for (neigh, intf) in kwargs['interfaces']:
+                    # Add the nodes one by one
+                    nodes = nodes + '[%s]=%s ' % (neigh, intf)
+                if kwargs['interfaces'] != []:
+                    # Eliminate last character
+                    nodes = nodes[:-1] + ")\n"
+                else:
+                    nodes = nodes + ")\n"
+                # Write on the file
+                outfile.write(nodes)
+>>>>>>> Stashed changes
         # Retrieve nets
         if kwargs.get('nets', None):
             self.nets = kwargs['nets']
@@ -556,6 +595,45 @@ class MHost(Host):
                 self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
         self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
+        # Let's write the hostname
+        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
+        # Let's write the id
+        self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        # Let's write the neighbors
+        if 'neighs' in kwargs:
+            neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
+            with open(neighs_sh, 'w') as outfile:
+                # Create header
+                nodes = "declare -a NEIGHS=("
+                # Iterate over management ips
+                for neigh in kwargs['neighs']:
+                    # Add the nodes one by one
+                    nodes = nodes + "%s " % neigh
+                if kwargs['neighs'] != []:
+                    # Eliminate last character
+                    nodes = nodes[:-1] + ")\n"
+                else:
+                    nodes = nodes + ")\n"
+                # Write on the file
+                outfile.write(nodes)
+        # Let's write the interfaces
+        if 'interfaces' in kwargs:
+            interfaces_sh = '%s/%s' % (self.dir, INTERFACES_SH)
+            with open(interfaces_sh, 'w') as outfile:
+                # Create header
+                nodes = "declare -A INTERFACES=("
+                # Iterate over management ips
+                for (neigh, intf) in kwargs['interfaces']:
+                    # Add the nodes one by one
+                    nodes = nodes + '[%s]=%s ' % (neigh, intf)
+                if kwargs['interfaces'] != []:
+                    # Eliminate last character
+                    nodes = nodes[:-1] + ")\n"
+                else:
+                    nodes = nodes + ")\n"
+                # Write on the file
+                outfile.write(nodes)
+>>>>>>> Stashed changes
         # Retrieve nets
         if kwargs.get('nets', None):
             self.nets = kwargs['nets']
