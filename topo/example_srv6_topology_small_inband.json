@@ -110,25 +110,12 @@
       },
       {
          "source":"controller",
-         "target":"wanrouter",
+         "target":"ads1",
          "view": "Data",
          "info": {
            "property": {
               "bw": 10,
               "delay": 100
-           },
-           "group": ""
-         }
-      },
-      {
-         "source":"ads1",
-         "target":"wanrouter",
-         "view": "Data",
-         "info": {
-           "property": {
-              "bw": 10,
-              "delay": 100,
-              "type": "mgmt"
            },
            "group": ""
          }
@@ -138,12 +125,7 @@
      {
       "info": {
         "type": "Router",
-        "property": {
-          "enable_ospf": true,
-          "scripts": [
-            "edge_device.sh controller"
-          ]
-        },
+        "property": {},
         "group": [200]
       },
       "id": "ads1"
@@ -151,12 +133,7 @@
      {
       "info": {
         "type": "Router",
-        "property": {
-          "enable_ospf": true,
-          "scripts": [
-            "edge_device.sh controller"
-          ]
-        },
+        "property": {},
         "group": [200]
       },
       "id": "ads2"
@@ -164,12 +141,7 @@
      {
       "info": {
         "type": "Router",
-        "property": {
-          "enable_ospf": true,
-          "scripts": [
-            "edge_device.sh controller"
-          ]
-        },
+        "property": {},
         "group": [200]
       },
       "id": "sur1"
@@ -224,27 +196,13 @@
      },
      {
       "info": {
-        "type": "Controller",
+        "type": "Host",
         "property": {
-          "outband": true,
-          "scripts": [
-            "nat_discovery_server.sh",
-            "sdwan_controller.sh ads1"
-          ]
+          "is_controller": true
         },
         "group": [200]
       },
       "id": "controller"
-     },
-     {
-      "info": {
-        "type": "Router",
-        "property": {
-            "type": "WANRouter"
-        },
-        "group": [200]
-      },
-      "id": "wanrouter"
      }
    ],
    "graph_parameters":{
