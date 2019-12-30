@@ -434,7 +434,7 @@ class SRv6Topo(Topo):
                 loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
             # Add the controller to the topology
             self.addHost(name=self.controller, cls=SRv6Controller, sshd=True, in_band=True,
-                            scripts=scripts, loopbackip=loopbackip, nodes=dict(), inNamespace=False,
+                            scripts=scripts, loopbackip=loopbackip, nodes=dict(), inNamespace=True,
                             nets=[], routes=[], neighs=[], interfaces=[], debug=self.debug)
             # Add node to the topology graph
             topology.add_node(self.controller, loopbackip=loopbackip, type="controller")
