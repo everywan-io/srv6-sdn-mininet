@@ -192,14 +192,6 @@ class SRv6Router(Host):
                 if kwargs.get('enable_ospf', False):
                     self.start_ospf6d(**kwargs)
                 self.start_staticd_ipv6(**kwargs)
-        # Run scripts
-        self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
-        self.exec_cmd('$PATH')
-        if 'scripts' in kwargs:
-            for script in kwargs['scripts']:
-                script_path = os.path.abspath(os.path.join('scripts', script))
-                self.exec_cmd('cd %s' % self.dir)
-                self.exec_cmd('bash %s &' % script_path)
         # Let's write the interfaces
         if 'nodes' in kwargs:
             nodes_sh = '%s/%s' % (self.dir, NODES_SH)
@@ -217,6 +209,16 @@ class SRv6Router(Host):
                     nodes = nodes + ")\n"
                 # Write on the file
                 outfile.write(nodes)
+        # Run scripts
+        self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
+        self.exec_cmd('$PATH')
+        if 'scripts' in kwargs:
+            for script in kwargs['scripts']:
+                script_path = os.path.abspath(os.path.join('scripts', script))
+                self.exec_cmd('cd %s' % self.dir)
+                #self.exec_cmd('screen -d -m bash %s &' % (script_path))
+                #self.exec_cmd('bash %s > %s/output.txt &' % (script_path, self.dir))
+                self.exec_cmd('bash %s &' % script_path)
 
     # Configure and start zebra for IPv6 emulation
     def start_zebra_ipv6(self, **kwargs):
@@ -612,13 +614,6 @@ class MHost(Host):
                 dest = route['dest']
                 via = route['via']
                 self.exec_cmd("ip route add %s via %s\n"  % (dest, via))
-        # Run scripts
-        self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
-        if 'scripts' in kwargs:
-            for script in kwargs['scripts']:
-                script_path = os.path.abspath(os.path.join('scripts', script))
-                self.exec_cmd('cd %s' % self.dir)
-                self.exec_cmd('bash %s &' % script_path)
         # Let's write the interfaces
         if 'nodes' in kwargs:
             nodes_sh = '%s/%s' % (self.dir, NODES_SH)
@@ -636,6 +631,13 @@ class MHost(Host):
                     nodes = nodes + ")\n"
                 # Write on the file
                 outfile.write(nodes)
+        # Run scripts
+        self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
+        if 'scripts' in kwargs:
+            for script in kwargs['scripts']:
+                script_path = os.path.abspath(os.path.join('scripts', script))
+                self.exec_cmd('cd %s' % self.dir)
+                self.exec_cmd('bash %s &' % script_path)
 
 
 # Abstraction to model a SRv6Controller
