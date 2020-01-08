@@ -31,6 +31,7 @@ import shutil
 import time
 import sys
 import re
+import random
 from datetime import datetime
 # Mininet dependencies
 from mininet.node import Host
@@ -68,6 +69,40 @@ DEVICEID_SH = 'devid.sh'
 HOSTNAME_SH = 'hostname.sh'
 # interfaces.sh file containing the interfaces
 INTERFACES_SH = 'interfaces.sh'
+# ips.sh file containing the ips
+IPS_SH = 'ips.sh'
+
+seed_initiated = False
+
+def generate_uuid():
+    global seed_initiated
+    seq = 'abcdef1234567890'
+    uuid = ''
+    # Initialize random seed
+    if not seed_initiated:
+        random.seed(0)
+        seed_initiated = True
+    # First block
+    for _ in range(0, 8):
+        uuid += random.choice(seq)
+    uuid += '-'
+    # Second block
+    for _ in range(0, 4):
+        uuid += random.choice(seq)
+    uuid += '-'
+    # Third block
+    for _ in range(0, 4):
+        uuid += random.choice(seq)
+    uuid += '-'
+    # Fourth block
+    for _ in range(0, 4):
+        uuid += random.choice(seq)
+    uuid += '-'
+    # Fifth block 
+    for _ in range(0, 12):
+        uuid += random.choice(seq)
+    # Return the UUID
+    return uuid
 
 
 # Abstraction to model a SRv6Router
@@ -105,7 +140,9 @@ class SRv6Router(Host):
         # Let's write the hostname
         self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
         # Let's write the id
-        self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        #self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        uuid = generate_uuid()
+        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" % (uuid, self.dir, DEVICEID_SH))
         # Let's write the neighbors
         if 'neighs' in kwargs:
             neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
@@ -209,6 +246,23 @@ class SRv6Router(Host):
                     nodes = nodes + ")\n"
                 # Write on the file
                 outfile.write(nodes)
+        # Let's write the ips
+        ips_sh = '%s/%s' % (self.dir, IPS_SH)
+        with open(ips_sh, 'w') as outfile:
+            # Create header
+            nodes = "declare -A IPS=("
+            # Iterate over management ips
+            for net in self.nets:
+                # Add the nodes one by one
+                ip = net['ip'].split('/')[0]
+                nodes = nodes + '[%s]=%s ' % (net['intf'], ip)
+            if self.nets != []:
+                # Eliminate last character
+                nodes = nodes[:-1] + ")\n"
+            else:
+                nodes = nodes + ")\n"
+            # Write on the file
+            outfile.write(nodes)
         # Run scripts
         self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
         self.exec_cmd('$PATH')
@@ -540,7 +594,9 @@ class MHost(Host):
         # Let's write the hostname
         self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
         # Let's write the id
-        self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        #self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
+        uuid = generate_uuid()
+        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" % (uuid, self.dir, DEVICEID_SH))
         # Let's write the neighbors
         if 'neighs' in kwargs:
             neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
@@ -575,6 +631,23 @@ class MHost(Host):
                     nodes = nodes + ")\n"
                 # Write on the file
                 outfile.write(nodes)
+        # Let's write the ips
+        ips_sh = '%s/%s' % (self.dir, IPS_SH)
+        with open(ips_sh, 'w') as outfile:
+            # Create header
+            nodes = "declare -A IPS=("
+            # Iterate over management ips
+            for net in self.nets:
+                # Add the nodes one by one
+                ip = net['ip'].split('/')[0]
+                nodes = nodes + '[%s]=%s ' % (net['intf'], ip)
+            if self.nets != []:
+                # Eliminate last character
+                nodes = nodes[:-1] + ")\n"
+            else:
+                nodes = nodes + ")\n"
+            # Write on the file
+            outfile.write(nodes)
         # Retrieve nets
         if kwargs.get('nets', None):
             self.nets = kwargs['nets']
