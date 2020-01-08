@@ -14,4 +14,5 @@ ip6tables -t nat -F
 ip6tables -t nat -X
 
 # Configure the NAT
+iptables -t nat -A POSTROUTING -o $interface -j MASQUERADE
 ip6tables -t nat -A POSTROUTING -o $interface -j MASQUERADE
