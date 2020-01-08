@@ -1,21 +1,6 @@
 {
    "edges":[
    	{
-         "source":"ewCont",
-         "target":"pRouter6",
-         "view": "Data",
-         "info": {
-           "property": {
-              "bw": 1,
-              "delay": 1000,
-              "type": "core",
-              "is_stub": true,
-              "is_private": false
-           },
-           "group": ""
-         }
-      },
-      {
          "source":"ewED1",
          "target":"modem1",
          "view": "Data",
@@ -386,7 +371,7 @@
          }
       },
       {
-         "source":"controller",
+         "source":"ewCont",
          "target":"wanrouter",
          "view": "Data",
          "info": {
@@ -399,7 +384,7 @@
          }
       },
       {
-         "source":"pRouter1",
+         "source":"pRouter6",
          "target":"wanrouter",
          "view": "Data",
          "info": {
@@ -413,16 +398,6 @@
       }
    ],
    "vertices":[
-   	{
-      "info": {
-        "type": "Host",
-        "property": {
-          "is_controller": true
-        },
-        "group": [200]
-      },
-      "id": "ewCont"
-     },
    	{
       "info": {
         "type": "Router",
@@ -707,7 +682,7 @@
         },
         "group": [200]
       },
-      "id": "controller"
+      "id": "ewCont"
      },
      {
       "info": {
