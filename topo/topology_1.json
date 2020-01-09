@@ -464,7 +464,7 @@
         "property": {
           "default_via": "modem1",
           "scripts": [
-            "edge_device.sh controller"
+            "edge_device.sh ewCont"
           ]
         },
         "group": [200]
@@ -477,7 +477,7 @@
         "property": {
           "default_via": "modem2",
           "scripts": [
-            "edge_device.sh controller"
+            "edge_device.sh ewCont"
           ]
         },
         "group": [200]
@@ -490,7 +490,7 @@
         "property": {
           "default_via": "modem3",
           "scripts": [
-            "edge_device.sh controller"
+            "edge_device.sh ewCont"
           ]
         },
         "group": [200]
@@ -503,7 +503,7 @@
         "property": {
           "default_via": "modem4",
           "scripts": [
-            "edge_device.sh controller"
+            "edge_device.sh ewCont"
           ]
         },
         "group": [200]
