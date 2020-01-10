@@ -674,7 +674,7 @@
       "info": {
         "type": "Controller",
         "property": {
-          "outband": true,
+          "outband": false,
           "scripts": [
             "nat_discovery_server.sh",
             "sdwan_controller.sh pRouter1"
