@@ -651,7 +651,7 @@ class SRv6Topo(Topo):
                     self.nodeInfo(self.controller)['routes'].append({'dest': self._net, 'via': mgmt_link_properties['iprhs']})
                     self.nodeInfo(self.controller)['routes'].append({'dest': self.customer_facing_net, 'via': mgmt_link_properties['iprhs']})
                     self.nodeInfo(self.controller)['routes'].append({'dest': self.access_net, 'via': mgmt_link_properties['iprhs']})
-                #self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iprhs']
+                self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iprhs']
                 if controller_loopbackip is not None:
                     self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': mgmt_link_properties['iplhs']})
             elif rhs == self.controller and lhs == self.wan_router:
@@ -662,7 +662,7 @@ class SRv6Topo(Topo):
                     self.nodeInfo(self.controller)['routes'].append({'dest': self._net, 'via': mgmt_link_properties['iplhs']})
                     self.nodeInfo(self.controller)['routes'].append({'dest': self.customer_facing_net, 'via': mgmt_link_properties['iplhs']})
                     self.nodeInfo(self.controller)['routes'].append({'dest': self.access_net, 'via': mgmt_link_properties['iplhs']})
-                #self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iplhs']
+                self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iplhs']
                 if controller_loopbackip is not None:
                     self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': mgmt_link_properties['iprhs']})
             elif rhs == self.wan_router and lhs in self.routers:
@@ -760,6 +760,8 @@ def stopAll():
     os.system('sudo mn -c')
     # Kill all the started daemons
     os.system('sudo killall sshd zebra ospf6d ospfd staticd')
+    # Kill all the started daemons
+    os.system('bash scripts/clean.sh')
     # Restart root ssh daemon
     os.system('service sshd restart')
 
