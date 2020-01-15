@@ -665,6 +665,29 @@ class SRv6Topo(Topo):
                 self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iplhs']
                 if controller_loopbackip is not None:
                     self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': mgmt_link_properties['iprhs']})
+            elif lhs == self.controller and rhs in self.routers:
+                #controller_wan_router_net = net
+                # Configure the default via of the controller and the WAN router
+                if self.outband_emulation:
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.mgmtNet, 'via': mgmt_link_properties['iprhs']})
+                else:
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self._net, 'via': mgmt_link_properties['iprhs']})
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.customer_facing_net, 'via': mgmt_link_properties['iprhs']})
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.access_net, 'via': mgmt_link_properties['iprhs']})
+                self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iprhs']
+                if controller_loopbackip is not None:
+                    self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': mgmt_link_properties['iplhs']})
+            elif rhs in self.routers and lhs == self.wan_router:
+                # Configure the default via of the controller and the WAN router
+                if self.outband_emulation:
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.mgmtNet, 'via': mgmt_link_properties['iplhs']})
+                else:
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self._net, 'via': mgmt_link_properties['iplhs']})
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.customer_facing_net, 'via': mgmt_link_properties['iplhs']})
+                    self.nodeInfo(self.controller)['routes'].append({'dest': self.access_net, 'via': mgmt_link_properties['iplhs']})
+                self.nodeInfo(self.controller)['default_via'] = mgmt_link_properties['iplhs']
+                if controller_loopbackip is not None:
+                    self.nodeInfo(self.wan_router)['routes'].append({'dest': controller_loopbackip, 'via': mgmt_link_properties['iprhs']})
             elif rhs == self.wan_router and lhs in self.routers:
                 # Add the route to the router
                 if controller_loopbackip is not None:

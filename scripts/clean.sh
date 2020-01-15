@@ -1,0 +1,2 @@
+killall turnserver
+killall etherws
