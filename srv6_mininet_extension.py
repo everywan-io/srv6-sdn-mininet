@@ -361,6 +361,13 @@ class SRv6Topo(Topo):
                         'net': mgmt_link_properties[0].net,
                         'prefix': mgmt_link_properties[0].prefix
                     })
+        self.mgmt = None
+        if self.controller is not None:
+            # Mgmt name
+            self.mgmt = 'mgmt'
+            generator.getHostsProperties([self.mgmt])
+            # Create a link between mgmt station and controller
+            self.mgmtIP = generator.getMgmtLinksProperties([(self.mgmt, self.controller)])[0]
         # Init steps
         Topo.__init__(self, **opts)
 
@@ -434,7 +441,8 @@ class SRv6Topo(Topo):
                 loopbackip = "%s/%s" % (loopbackIP, LoopbackAllocator.prefix)
             # Add the controller to the topology
             self.addHost(name=self.controller, cls=SRv6Controller, sshd=True, in_band=True,
-                            scripts=scripts, loopbackip=loopbackip, nodes=dict(), inNamespace=False,
+                            scripts=scripts, loopbackip=loopbackip, nodes=dict(),
+                            inNamespace=not self.outband_emulation,
                             nets=[], routes=[], neighs=[], interfaces=[], debug=self.debug)
             # Add node to the topology graph
             topology.add_node(self.controller, loopbackip=loopbackip, type="controller")
@@ -739,6 +747,42 @@ class SRv6Topo(Topo):
                     self.nodeInfo(self.controller)['nodes'][node] = nodes_to_ips[node][0]
                 for node2 in nodes:
                     self.nodeInfo(node2)['nodes'][node] = nodes_to_ips[node][0]
+        if not self.outband_emulation and self.mgmt is not None:
+            # Create the mgmt node in the root namespace
+            self.addHost(name=self.mgmt, cls=MHost, sshd=False,
+                         use_ipv4_addressing=self.use_ipv4_addressing,
+                         inNamespace=False, nets=[], routes=[])
+            # Create a link between mgmt switch and mgmt station
+            self.addLink(self.mgmt, self.controller, bw=1000, delay=0)
+            # Get Port number
+            portNumber = self.port(self.mgmt, self.controller)
+            # Create lhs_intf
+            lhsintf = "%s-eth%d" % (self.mgmt, portNumber[0])
+            # Create rhs_intf
+            rhsintf = "%s-eth%d" % (self.controller, portNumber[1])
+            print('%s/%s' % (self.mgmtIP.iplhs, self.mgmtIP.prefix))
+            net = {
+                'intf': lhsintf,
+                'ip': '%s/%s' % (self.mgmtIP.iplhs, self.mgmtIP.prefix),
+                'bw': 1000,
+                'delay': 0,
+                'net': self.mgmtIP.net,
+            }
+            self.nodeInfo(self.mgmt)['nets'].append(net)
+            net = {
+                'intf': rhsintf,
+                'ip': '%s/%s' % (self.mgmtIP.iprhs, self.mgmtIP.prefix),
+                'bw': 1000,
+                'delay': 0,
+                'net': self.mgmtIP.net,
+            }
+            self.nodeInfo(self.controller)['nets'].append(net)
+            self.nodeInfo(self.mgmt)['routes'].append({'dest': self.mgmtIP.net, 'via': self.mgmtIP.iplhs})
+            self.nodeInfo(self.mgmt)['routes'].append({'dest': self._net, 'via': self.mgmtIP.iplhs})
+            #self.nodeInfo(self.mgmt)['routes'].append({'dest': self.customer_facing_net, 'via': self.mgmtIP.iplhs})
+            #self.nodeInfo(self.mgmt)['routes'].append({'dest': self.access_net, 'via': self.mgmtIP.iplhs})
+            self.nodeInfo(self.mgmt)['routes'].append({'dest': controller_loopbackip, 'via': self.mgmtIP.iplhs})
+            self.nodeInfo(self.mgmt)['routes'].append({'dest': controller_wan_router_net, 'via': self.mgmtIP.iplhs})
 
 
 # Utility function to dump relevant information of the emulation

@@ -54,6 +54,6 @@ etherws sw
 #sleep 5
 sleep 15
 echo --nat-discovery-server-ip $NAT
-python -m pymerang.pymerang_client --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --nat-discovery-client-port 4789 --server-ip $CONTROLLER --server-port 50061 &
-sleep 5
 python -m srv6_sdn_data_plane.southbound.grpc.sb_grpc_server --debug &
+sleep 5
+python -m pymerang.pymerang_client --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --nat-discovery-client-port 4789 --server-ip $CONTROLLER --server-port 50061 &
