@@ -2,13 +2,12 @@
 
 # Script to configure a stateful firewall
 
-# Take arguments from the command-line
-#int_interface=$1
-#ext_interface=$2
-
+# General imports
 source interfaces.sh
 
+# Internal interface
 int_interface=${INTERFACES[$1]}
+# External interface
 ext_interface=${INTERFACES[$2]}
 
 # First cleanup everything

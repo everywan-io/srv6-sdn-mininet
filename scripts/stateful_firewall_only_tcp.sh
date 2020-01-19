@@ -1,14 +1,13 @@
 #!/bin/bash
 
-# Script to configure a stateful firewall
+# Script to configure a stateful firewall allowing only TCP traffic
 
-#int_interface=$1
-#ext_interface=$2
-
-
+# General imports
 source interfaces.sh
 
+# Internal interface
 int_interface=${INTERFACES[$1]}
+# External interface
 ext_interface=${INTERFACES[$2]}
 
 # First cleanup everything

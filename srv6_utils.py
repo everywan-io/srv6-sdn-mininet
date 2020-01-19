@@ -23,19 +23,15 @@
 # @author Pier Luigi Ventre <pierventre@hotmail.com>
 # @author Stefano Salsano <stefano.salsano@uniroma2.it>
 
-from __future__ import absolute_import, division, print_function
 
 # General imports
+from __future__ import absolute_import, division, print_function
 import os
 import shutil
-import time
 import sys
-import re
 import random
-from datetime import datetime
 # Mininet dependencies
 from mininet.node import Host
-from mininet.log import error
 # SRv6 dependencies
 from srv6_generators import RANGE_FOR_AREA_0
 
@@ -59,6 +55,8 @@ RA_INTERVAL = 10
 # executed outside the virtual environment
 PYTHON_PATH = sys.executable
 
+# Filenames of the bash scripts
+#
 # nodes.sh file containing the nodes
 NODES_SH = 'nodes.sh'
 # neighs.sh containing the neighbors
@@ -72,16 +70,16 @@ INTERFACES_SH = 'interfaces.sh'
 # ips.sh file containing the ips
 IPS_SH = 'ips.sh'
 
-seed_initiated = False
+# Initialize random seed
+random.seed(0)
 
+
+# Generate a random UUID used to identify the node
 def generate_uuid():
+    # Example of UUID: 7a0525c1-22e9-cc50-d44d-5149c7524f1f
     global seed_initiated
     seq = 'abcdef1234567890'
     uuid = ''
-    # Initialize random seed
-    if not seed_initiated:
-        random.seed(0)
-        seed_initiated = True
     # First block
     for _ in range(0, 8):
         uuid += random.choice(seq)
@@ -98,7 +96,7 @@ def generate_uuid():
     for _ in range(0, 4):
         uuid += random.choice(seq)
     uuid += '-'
-    # Fifth block 
+    # Fifth block
     for _ in range(0, 12):
         uuid += random.choice(seq)
     # Return the UUID
@@ -132,65 +130,64 @@ class SRv6Router(Host):
         for intf in self.intfs.values():
             # Remove any configured address
             self.exec_cmd('ifconfig %s 0' % intf.name)
-            # For the first one, let's configure the mgmt address
-            if intf.name == kwargs.get('mgmtintf'):
-                self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
         self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
         # Let's write the hostname
-        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
+        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" %
+                      (self.name, self.dir, HOSTNAME_SH))
         # Let's write the id
-        #self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
         uuid = generate_uuid()
-        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" % (uuid, self.dir, DEVICEID_SH))
+        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" %
+                      (uuid, self.dir, DEVICEID_SH))
         # Let's write the neighbors
-        if 'neighs' in kwargs:
+        if kwargs.get('neighs', None) is not None:
             neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
             with open(neighs_sh, 'w') as outfile:
                 # Create header
-                nodes = "declare -a NEIGHS=("
-                # Iterate over management ips
+                neighs = "declare -a NEIGHS=("
+                # Iterate over neighbor ips
                 for neigh in kwargs['neighs']:
-                    # Add the nodes one by one
-                    nodes = nodes + "%s " % neigh
+                    # Add the neighs one by one
+                    neighs = neighs + "%s " % neigh
                 if kwargs['neighs'] != []:
                     # Eliminate last character
-                    nodes = nodes[:-1] + ")\n"
+                    neighs = neighs[:-1] + ")\n"
                 else:
-                    nodes = nodes + ")\n"
+                    neighs = neighs + ")\n"
                 # Write on the file
-                outfile.write(nodes)
+                outfile.write(neighs)
         # Let's write the interfaces
-        if 'interfaces' in kwargs:
+        if kwargs.get('interfaces', None) is not None:
             interfaces_sh = '%s/%s' % (self.dir, INTERFACES_SH)
             with open(interfaces_sh, 'w') as outfile:
                 # Create header
-                nodes = "declare -A INTERFACES=("
-                # Iterate over management ips
+                interfaces = "declare -A INTERFACES=("
+                # Iterate over interfaces
                 for (neigh, intf) in kwargs['interfaces']:
-                    # Add the nodes one by one
-                    nodes = nodes + '[%s]=%s ' % (neigh, intf)
+                    # Add the interfaces one by one
+                    interfaces = interfaces + '[%s]=%s ' % (neigh, intf)
                 if kwargs['interfaces'] != []:
                     # Eliminate last character
-                    nodes = nodes[:-1] + ")\n"
+                    interfaces = interfaces[:-1] + ")\n"
                 else:
-                    nodes = nodes + ")\n"
+                    interfaces = interfaces + ")\n"
                 # Write on the file
-                outfile.write(nodes)
+                outfile.write(interfaces)
         # Retrieve nets
-        if kwargs.get('nets', None):
+        self.nets = list()
+        if kwargs.get('nets', None) is not None:
             self.nets = kwargs['nets']
         # If requested
-        if kwargs['sshd']:
+        if kwargs.get('sshd', False):
             # Let's start sshd daemon in the hosts
             self.exec_cmd('/usr/sbin/sshd -D &')
         # Configure the loopback address
-        if kwargs.get('loopbackip', None):
+        if kwargs.get('loopbackip', None) is not None:
             self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
             self.nets.append({
-              'intf': 'lo',
-              'ip': kwargs['loopbackip'],
-              'net': kwargs['loopbackip']})
+                'intf': 'lo',
+                'ip': kwargs['loopbackip'],
+                'net': kwargs['loopbackip']})
         # Enable IPv6 forwarding
         self.exec_cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
         # Enable IPv4 forwarding
@@ -206,17 +203,21 @@ class SRv6Router(Host):
         # Iterate over the interfaces
         for intf in self.intfs.values():
             # Enable IPv6 forwarding
-            self.exec_cmd("sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
+            self.exec_cmd(
+                "sysctl -w net.ipv6.conf.%s.forwarding=1" % intf.name)
             # Enable IPv4 forwarding
-            self.exec_cmd("sysctl -w net.ipv4.conf.%s.forwarding=1" % intf.name)
+            self.exec_cmd(
+                "sysctl -w net.ipv4.conf.%s.forwarding=1" % intf.name)
             # Disable Reverse Path Forwarding filter
             self.exec_cmd("sysctl -w net.ipv4.conf.%s.rp_filter=0" % intf.name)
             # Enable SRv6 on the interface
-            self.exec_cmd("sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
+            self.exec_cmd(
+                "sysctl -w net.ipv6.conf.%s.seg6_enabled=1" % intf.name)
             # Disable RA accept (stateless address autoconfiguration)
             self.exec_cmd("sysctl -w net.ipv6.conf.%s.accept_ra=0" % intf.name)
             # Force Linux to keep all IPv6 addresses on an interface down event
-            self.exec_cmd("sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1" % intf.name)
+            self.exec_cmd(
+                "sysctl -w net.ipv6.conf.%s.keep_addr_on_down=1" % intf.name)
         # Zebra and Quagga config
         if len(self.nets) > 0:
             if kwargs.get('use_ipv4_addressing', False):
@@ -230,12 +231,12 @@ class SRv6Router(Host):
                     self.start_ospf6d(**kwargs)
                 self.start_staticd_ipv6(**kwargs)
         # Let's write the interfaces
-        if 'nodes' in kwargs:
+        if kwargs.get('nodes', None) is not None:
             nodes_sh = '%s/%s' % (self.dir, NODES_SH)
             with open(nodes_sh, 'w') as outfile:
                 # Create header
                 nodes = "declare -A NODES=("
-                # Iterate over management ips
+                # Iterate over nodes
                 for node, ip in kwargs['nodes'].items():
                     # Add the nodes one by one
                     nodes = nodes + '[%s]=%s ' % (node, ip)
@@ -250,33 +251,34 @@ class SRv6Router(Host):
         ips_sh = '%s/%s' % (self.dir, IPS_SH)
         with open(ips_sh, 'w') as outfile:
             # Create header
-            nodes = "declare -A IPS=("
-            # Iterate over management ips
+            ips = "declare -A IPS=("
+            # Iterate over ips
             for net in self.nets:
-                # Add the nodes one by one
+                # Add the ips one by one
                 ip = net['ip'].split('/')[0]
-                nodes = nodes + '[%s]=%s ' % (net['intf'], ip)
+                ips = ips + '[%s]=%s ' % (net['intf'], ip)
             if self.nets != []:
                 # Eliminate last character
-                nodes = nodes[:-1] + ")\n"
+                ips = ips[:-1] + ")\n"
             else:
-                nodes = nodes + ")\n"
+                ips = ips + ")\n"
             # Write on the file
-            outfile.write(nodes)
-        # Run scripts
+            outfile.write(ips)
+        # Add python path to PATH environment variable
+        # This solves the issue of python commands executed
+        # outside the virtual environment
         self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
-        self.exec_cmd('$PATH')
-        if 'scripts' in kwargs:
-            for script in kwargs['scripts']:
-                script_path = os.path.abspath(os.path.join('scripts', script))
-                self.exec_cmd('cd %s' % self.dir)
-                #self.exec_cmd('screen -d -m bash %s &' % (script_path))
-                #self.exec_cmd('bash %s > %s/output.txt &' % (script_path, self.dir))
-                self.exec_cmd('bash %s &' % script_path)
+        # Run scripts
+        for script in kwargs.get('scripts', []):
+            # Change directory to the host dir
+            self.exec_cmd('cd %s' % self.dir)
+            # Execute the script
+            script_path = os.path.abspath(os.path.join('scripts', script))
+            self.exec_cmd('bash %s &' % script_path)
 
     # Configure and start zebra for IPv6 emulation
     def start_zebra_ipv6(self, **kwargs):
-        # Zebra and Quagga config
+        # Zebra and FRR config
         if len(self.nets) > 0:
             zebra = open("%s/zebra.conf" % self.dir, 'w')
             zebra.write("! -*- zebra -*-\n!\nhostname %s\n" %
@@ -296,34 +298,33 @@ class SRv6Router(Host):
                                 " ipv6 nd ra-interval %s\n"
                                 " ipv6 address %s\n"
                                 " ipv6 nd prefix %s\n!\n"
-                                % (net['intf'], min(net['bw']*1000, 100000), RA_INTERVAL,
-                                   net['ip'], net['net']))
+                                % (net['intf'], min(net['bw']*1000, 100000),
+                                   RA_INTERVAL, net['ip'], net['net']))
             zebra.close()
             # Right permission and owners
             self.exec_cmd("chown frr /var/run")
             self.exec_cmd("chown frr %s/*.conf" % self.dir)
             self.exec_cmd("chown frr %s/." % self.dir)
             self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
-            self.start_time_zebra = datetime.now().replace(microsecond=0)
             # Start daemons
             self.exec_cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
-                     "%s/zebra.pid" % (self.dir, self.dir, self.dir))
+                          "%s/zebra.pid" % (self.dir, self.dir, self.dir))
 
     def start_staticd_ipv4(self, **kwargs):
         staticd = open("%s/staticd.conf" % self.dir, 'w')
         staticd.write("! -*- staticd -*-\n!\nhostname %s\n" % self.name)
         staticd.write("password srv6\nlog file %s/staticd.log\n!\n" %
-                    self.dir)
+                      self.dir)
         # Configure the default via
         default_via = kwargs.get('default_via', None)
         if default_via is not None:
-            staticd.write("ip route %s %s\n"  % ('0.0.0.0/0', default_via))
+            staticd.write("ip route %s %s\n" % ('0.0.0.0/0', default_via))
         # Configure the routes
         if kwargs.get('routes', None):
             for route in kwargs['routes']:
                 dest = route['dest']
                 via = route['via']
-                staticd.write("ip route %s %s\n"  % (dest, via))
+                staticd.write("ip route %s %s\n" % (dest, via))
         staticd.close()
         self.exec_cmd("chown frr /var/run")
         self.exec_cmd("chown frr %s/*.conf" % self.dir)
@@ -331,17 +332,17 @@ class SRv6Router(Host):
         self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
         # Start daemons
         self.exec_cmd("staticd -f %s/staticd.conf -d -z %s/zebra.sock -i "
-                        "%s/staticd.pid" % (self.dir, self.dir, self.dir))
+                      "%s/staticd.pid" % (self.dir, self.dir, self.dir))
 
     def start_staticd_ipv6(self, **kwargs):
         staticd = open("%s/staticd.conf" % self.dir, 'w')
         staticd.write("! -*- staticd -*-\n!\nhostname %s\n" % self.name)
         staticd.write("password srv6\nlog file %s/staticd.log\n!\n" %
-                    self.dir)
+                      self.dir)
         # Configure the default via
         default_via = kwargs.get('default_via', None)
         if default_via is not None:
-            staticd.write("ipv6 route %s %s\n"  % ('::/0', default_via))
+            staticd.write("ipv6 route %s %s\n" % ('::/0', default_via))
         # Add static route for router network
         if kwargs.get('routernet', None):
             routernet = kwargs['routernet']
@@ -351,15 +352,15 @@ class SRv6Router(Host):
             for route in kwargs['routes']:
                 dest = route['dest']
                 via = route['via']
-                staticd.write("ipv6 route %s %s\n"  % (dest, via))
+                staticd.write("ipv6 route %s %s\n" % (dest, via))
         staticd.close()
         self.exec_cmd("chown frr /var/run")
         self.exec_cmd("chown frr %s/*.conf" % self.dir)
         self.exec_cmd("chown frr %s/." % self.dir)
         self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
-        # Start daemons
+        # Start zebra daemon
         self.exec_cmd("staticd -f %s/staticd.conf -d -z %s/zebra.sock -i "
-                        "%s/staticd.pid" % (self.dir, self.dir, self.dir))
+                      "%s/staticd.pid" % (self.dir, self.dir, self.dir))
 
     # Configure and start ospf6d for IPv6 emulation
     def start_ospf6d(self, **kwargs):
@@ -387,15 +388,17 @@ class SRv6Router(Host):
                                         " ipv6 ospf6 cost %s\n"
                                         " ipv6 ospf6 hello-interval %s\n"
                                         " ipv6 ospf6 dead-interval %s\n"
-                                        " ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        " ipv6 ospf6 retransmit-interval %s\n"
+                                        "!\n"
                                         % (net['intf'], cost, HELLO_INTERVAL,
-                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                         else:
                             ospfd.write("interface %s\n"
                                         " ipv6 ospf6 passive\n"
                                         " ipv6 ospf6 hello-interval %s\n"
                                         " ipv6 ospf6 dead-interval %s\n"
-                                        " ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        " ipv6 ospf6 retransmit-interval %s\n"
+                                        "!\n"
                                         % (net['intf'], HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                     else:
@@ -406,7 +409,8 @@ class SRv6Router(Host):
                                         " ipv6 ospf6 cost %s\n"
                                         " ipv6 ospf6 hello-interval %s\n"
                                         " ipv6 ospf6 dead-interval %s\n"
-                                        " ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        " ipv6 ospf6 retransmit-interval %s\n"
+                                        "!\n"
                                         % (net['intf'], cost, HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
                         else:
@@ -414,7 +418,8 @@ class SRv6Router(Host):
                                         " no ipv6 ospf6 passive\n"
                                         " ipv6 ospf6 hello-interval %s\n"
                                         " ipv6 ospf6 dead-interval %s\n"
-                                        " ipv6 ospf6 retransmit-interval %s\n!\n"
+                                        " ipv6 ospf6 retransmit-interval %s\n"
+                                        "!\n"
                                         % (net['intf'], HELLO_INTERVAL,
                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
             # Finishing ospf6d conf
@@ -427,7 +432,8 @@ class SRv6Router(Host):
             # Iterate again over the nets to finish area part
             for net in self.nets:
                 if net.get('is_private', False):
-                    ospfd.write(" no interface %s area 0.0.0.0\n" % (net['intf']))
+                    ospfd.write(" no interface %s area 0.0.0.0\n" %
+                                (net['intf']))
                 else:
                     ospfd.write(" interface %s area 0.0.0.0\n" % (net['intf']))
             ospfd.write("!\n")
@@ -437,8 +443,9 @@ class SRv6Router(Host):
             self.exec_cmd("chown frr %s/*.conf" % self.dir)
             self.exec_cmd("chown frr %s/." % self.dir)
             self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
+            # Start ospf6d daemon
             self.exec_cmd("ospf6d -f %s/ospf6d.conf -d -z %s/zebra.sock -i "
-                     "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
+                          "%s/ospf6d.pid" % (self.dir, self.dir, self.dir))
 
     # Configure and start zebra for IPv4 emulation
     def start_zebra_ipv4(self, **kwargs):
@@ -459,18 +466,17 @@ class SRv6Router(Host):
                                 " link-detect\n"
                                 " bandwidth %s\n"
                                 " ip address %s\n!\n"
-                                % (net['intf'], min(net['bw']*1000, 100000), net['ip']))
+                                % (net['intf'], min(net['bw']*1000, 100000),
+                                   net['ip']))
             zebra.close()
             # Right permission and owners
             self.exec_cmd("chown frr /var/run")
             self.exec_cmd("chown frr %s/*.conf" % self.dir)
             self.exec_cmd("chown frr %s/." % self.dir)
             self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
-            self.start_time_zebra = datetime.now().replace(microsecond=0)
-            # Start daemons
+            # Start zebra daemon
             self.exec_cmd("zebra -f %s/zebra.conf -d -z %s/zebra.sock -i "
                           "%s/zebra.pid" % (self.dir, self.dir, self.dir))
-
 
     # Configure and start ospfd for IPv4 emulation
     def start_ospfd(self, **kwargs):
@@ -499,17 +505,21 @@ class SRv6Router(Host):
                                         " ip ospf cost %s\n"
                                         " ip ospf hello-interval %s\n"
                                         " ip ospf dead-interval %s\n"
-                                        " ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], enable_ospf, cost, HELLO_INTERVAL,
-                                            DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                                        " ip ospf retransmit-interval %s\n"
+                                        "!\n"
+                                        % (net['intf'], enable_ospf, cost,
+                                           HELLO_INTERVAL, DEAD_INTERVAL,
+                                           RETRANSMIT_INTERVAL))
                         else:
                             ospfd.write("interface %s\n"
                                         " %sip ospf area 0.0.0.0\n"
                                         " ip ospf hello-interval %s\n"
                                         " ip ospf dead-interval %s\n"
-                                        " ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], enable_ospf, HELLO_INTERVAL,
-                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                                        " ip ospf retransmit-interval %s\n"
+                                        "!\n"
+                                        % (net['intf'], enable_ospf,
+                                           HELLO_INTERVAL, DEAD_INTERVAL,
+                                           RETRANSMIT_INTERVAL))
                     else:
                         # Transit network
                         if cost is not None:
@@ -518,17 +528,21 @@ class SRv6Router(Host):
                                         " ip ospf cost %s\n"
                                         " ip ospf hello-interval %s\n"
                                         " ip ospf dead-interval %s\n"
-                                        " ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], enable_ospf, cost, HELLO_INTERVAL,
-                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                                        " ip ospf retransmit-interval %s\n"
+                                        "!\n"
+                                        % (net['intf'], enable_ospf, cost,
+                                           HELLO_INTERVAL, DEAD_INTERVAL,
+                                           RETRANSMIT_INTERVAL))
                         else:
                             ospfd.write("interface %s\n"
                                         " %sip ospf area 0.0.0.0\n"
                                         " ip ospf hello-interval %s\n"
                                         " ip ospf dead-interval %s\n"
-                                        " ip ospf retransmit-interval %s\n!\n"
-                                        % (net['intf'], enable_ospf, HELLO_INTERVAL,
-                                           DEAD_INTERVAL, RETRANSMIT_INTERVAL))
+                                        " ip ospf retransmit-interval %s\n"
+                                        "!\n"
+                                        % (net['intf'], enable_ospf,
+                                           HELLO_INTERVAL, DEAD_INTERVAL,
+                                           RETRANSMIT_INTERVAL))
             # Finishing ospf6d conf
             if kwargs.get('routerid', None):
                 routerid = kwargs['routerid']
@@ -547,8 +561,9 @@ class SRv6Router(Host):
             self.exec_cmd("chown frr %s/*.conf" % self.dir)
             self.exec_cmd("chown frr %s/." % self.dir)
             self.exec_cmd("chmod 640 %s/*.conf" % self.dir)
+            # Start ospfd daemon
             self.exec_cmd("ospfd -f %s/ospfd.conf -d -z %s/zebra.sock -i "
-                     "%s/ospfd.pid" % (self.dir, self.dir, self.dir))
+                          "%s/ospfd.pid" % (self.dir, self.dir, self.dir))
 
     # Clean up the environment
     def cleanup(self):
@@ -586,75 +601,81 @@ class MHost(Host):
         for intf in self.intfs.values():
             # Remove any configured address
             self.exec_cmd('ip a flush dev %s scope global' % intf.name)
-            # For the first one, let's configure the mgmt address
-            if intf.name == kwargs.get('mgmtintf'):
-                self.exec_cmd('ip a a %s dev %s' % (kwargs['mgmtip'], intf.name))
         # Let's write the hostname in /var/mininet/hostname
         self.exec_cmd("echo '" + self.name + "' > /var/mininet/hostname")
         # Let's write the hostname
-        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" % (self.name, self.dir, HOSTNAME_SH))
+        self.exec_cmd("echo 'HOSTNAME=%s' > %s/%s" %
+                      (self.name, self.dir, HOSTNAME_SH))
         # Let's write the id
-        #self.exec_cmd("echo 'DEVICEID='$(cat /proc/sys/kernel/random/uuid)'' > %s/%s" % (self.dir, DEVICEID_SH))
         uuid = generate_uuid()
-        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" % (uuid, self.dir, DEVICEID_SH))
+        self.exec_cmd("echo 'DEVICEID=%s' > %s/%s" %
+                      (uuid, self.dir, DEVICEID_SH))
         # Let's write the neighbors
-        if 'neighs' in kwargs:
+        if kwargs.get('neighs', None) is not None:
             neighs_sh = '%s/%s' % (self.dir, NEIGHS_SH)
             with open(neighs_sh, 'w') as outfile:
                 # Create header
-                nodes = "declare -a NEIGHS=("
-                # Iterate over management ips
+                neighs = "declare -a NEIGHS=("
+                # Iterate over neighbors
                 for neigh in kwargs['neighs']:
-                    # Add the nodes one by one
-                    nodes = nodes + "%s " % neigh
+                    # Add the neighs one by one
+                    neighs = neighs + "%s " % neigh
                 if kwargs['neighs'] != []:
                     # Eliminate last character
-                    nodes = nodes[:-1] + ")\n"
+                    neighs = neighs[:-1] + ")\n"
                 else:
-                    nodes = nodes + ")\n"
+                    neighs = neighs + ")\n"
                 # Write on the file
-                outfile.write(nodes)
+                outfile.write(neighs)
         # Let's write the interfaces
-        if 'interfaces' in kwargs:
+        if kwargs.get('interfaces', None) is not None:
             interfaces_sh = '%s/%s' % (self.dir, INTERFACES_SH)
             with open(interfaces_sh, 'w') as outfile:
                 # Create header
-                nodes = "declare -A INTERFACES=("
-                # Iterate over management ips
+                interfaces = "declare -A INTERFACES=("
+                # Iterate over interfaces
                 for (neigh, intf) in kwargs['interfaces']:
-                    # Add the nodes one by one
-                    nodes = nodes + '[%s]=%s ' % (neigh, intf)
+                    # Add the interfaces one by one
+                    interfaces = interfaces + '[%s]=%s ' % (neigh, intf)
                 if kwargs['interfaces'] != []:
                     # Eliminate last character
-                    nodes = nodes[:-1] + ")\n"
+                    interfaces = interfaces[:-1] + ")\n"
                 else:
-                    nodes = nodes + ")\n"
+                    interfaces = interfaces + ")\n"
                 # Write on the file
-                outfile.write(nodes)
+                outfile.write(interfaces)
         # Let's write the ips
         ips_sh = '%s/%s' % (self.dir, IPS_SH)
         with open(ips_sh, 'w') as outfile:
             # Create header
-            nodes = "declare -A IPS=("
-            # Iterate over management ips
+            ips = "declare -A IPS=("
+            # Iterate over ips
             for net in self.nets:
-                # Add the nodes one by one
+                # Add the ips one by one
                 ip = net['ip'].split('/')[0]
-                nodes = nodes + '[%s]=%s ' % (net['intf'], ip)
+                ips = ips + '[%s]=%s ' % (net['intf'], ip)
             if self.nets != []:
                 # Eliminate last character
-                nodes = nodes[:-1] + ")\n"
+                ips = ips[:-1] + ")\n"
             else:
-                nodes = nodes + ")\n"
+                ips = ips + ")\n"
             # Write on the file
-            outfile.write(nodes)
+            outfile.write(ips)
         # Retrieve nets
-        if kwargs.get('nets', None):
+        self.nets = list()
+        if kwargs.get('nets', None) is not None:
             self.nets = kwargs['nets']
         # If requested
-        if kwargs['sshd']:
+        if kwargs.get('sshd', False):
             # Let's start sshd daemon in the hosts
             self.exec_cmd('/usr/sbin/sshd -D &')
+        # Configure the loopback address
+        if kwargs.get('loopbackip', None) is not None:
+            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
+            self.nets.append({
+                'intf': 'lo',
+                'ip': kwargs['loopbackip'],
+                'net': kwargs['loopbackip']})
         # Disable IPv6 address autoconfiguration
         self.exec_cmd('sysctl -w net.ipv6.conf.all.autoconf=0')
         # Enable RA accept (stateless address autoconfiguration)
@@ -682,18 +703,17 @@ class MHost(Host):
             self.exec_cmd('ip -6 r d default')
             self.exec_cmd('ip r a default via %s' % default_via)
         # Configure the routes
-        if kwargs.get('routes', None):
-            for route in kwargs['routes']:
-                dest = route['dest']
-                via = route['via']
-                self.exec_cmd("ip route add %s via %s\n"  % (dest, via))
+        for route in kwargs.get('routes', []):
+            dest = route['dest']
+            via = route['via']
+            self.exec_cmd("ip route add %s via %s\n" % (dest, via))
         # Let's write the interfaces
-        if 'nodes' in kwargs:
+        if kwargs.get('nodes', None) is not None:
             nodes_sh = '%s/%s' % (self.dir, NODES_SH)
             with open(nodes_sh, 'w') as outfile:
                 # Create header
                 nodes = "declare -A NODES=("
-                # Iterate over management ips
+                # Iterate over nodes
                 for node, ip in kwargs['nodes'].items():
                     # Add the nodes one by one
                     nodes = nodes + '[%s]=%s ' % (node, ip)
@@ -704,13 +724,17 @@ class MHost(Host):
                     nodes = nodes + ")\n"
                 # Write on the file
                 outfile.write(nodes)
-        # Run scripts
+        # Add python path to PATH environment variable
+        # This solves the issue of python commands executed
+        # outside the virtual environment
         self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
-        if 'scripts' in kwargs:
-            for script in kwargs['scripts']:
-                script_path = os.path.abspath(os.path.join('scripts', script))
-                self.exec_cmd('cd %s' % self.dir)
-                self.exec_cmd('bash %s &' % script_path)
+        # Run scripts
+        for script in kwargs.get('scripts', []):
+            # Change directory to the host dir
+            self.exec_cmd('cd %s' % self.dir)
+            # Execute the script
+            script_path = os.path.abspath(os.path.join('scripts', script))
+            self.exec_cmd('bash %s &' % script_path)
 
 
 # Abstraction to model a SRv6Controller
@@ -720,13 +744,6 @@ class SRv6Controller(MHost):
     def config(self, **kwargs):
 
         MHost.config(self, **kwargs)
-        # Configure the loopback address
-        if kwargs.get('loopbackip', None):
-            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
-            self.nets.append({
-              'intf': 'lo',
-              'ip': kwargs['loopbackip'],
-              'net': kwargs['loopbackip']})
 
 
 # Abstraction to model a SRv6Firewall
@@ -736,17 +753,7 @@ class WANRouter(MHost):
     def config(self, **kwargs):
 
         MHost.config(self, **kwargs)
-        script = kwargs.get('script')
-        if script is not None:
-            pass
         # Enable IPv6 forwarding
         self.exec_cmd("sysctl -w net.ipv6.conf.all.forwarding=1")
         # Enable IPv4 forwarding
         self.exec_cmd("sysctl -w net.ipv4.conf.all.forwarding=1")
-        # Configure the loopback address
-        if kwargs.get('loopbackip', None):
-            self.exec_cmd('ip a a %s dev lo' % (kwargs['loopbackip']))
-            self.nets.append({
-              'intf': 'lo',
-              'ip': kwargs['loopbackip'],
-              'net': kwargs['loopbackip']})
