@@ -17,7 +17,13 @@ EDGE=$2
 EDGE=${NODES[$EDGE]}
 # Name of the interface facing the public net
 INPUT_INTERFACE=${INTERFACES[$INPUT_INTERFACE]}
+# IP of the interface facing the public net
+IP_INTERFACE=${IPS[$INPUT_INTERFACE]}
 
 # Add the port forwarding rule
-iptables -t nat -A PREROUTING -i $INPUT_INTERFACE -p udp --dport 4789 -j DNAT --to $EDGE:4789
+iptables -t nat -I PREROUTING 1 -i $INPUT_INTERFACE -p udp --dport 40000 -j DNAT --to $EDGE:4789
+iptables -t nat -I POSTROUTING 1 -o $INPUT_INTERFACE -p udp --source $EDGE --sport 4789 -j SNAT --to-source $IP_INTERFACE:40000
 
+# Ful Cone NAT
+#iptables -t nat -A POSTROUTING -o $INPUT_INTERFACE -j SNAT --to-source $IP_INTERFACE
+#iptables -t nat -A PREROUTING -i $INPUT_INTERFACE -p udp -j DNAT --to-destination $EDGE
