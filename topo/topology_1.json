@@ -492,7 +492,8 @@
         "property": {
           "default_via": "modem1",
           "scripts": [
-            "edge_device.sh ewCont natDS modem1"
+            "edge_device.sh ewCont natDS modem1",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -505,7 +506,8 @@
         "property": {
           "default_via": "modem2",
           "scripts": [
-            "edge_device.sh ewCont natDS modem2"
+            "edge_device.sh ewCont natDS modem2",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -518,7 +520,8 @@
         "property": {
           "default_via": "modem3",
           "scripts": [
-            "edge_device.sh ewCont natDS modem3"
+            "edge_device.sh ewCont natDS modem3",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -531,7 +534,8 @@
         "property": {
           "default_via": "modem4",
           "scripts": [
-            "edge_device.sh ewCont natDS modem4"
+            "edge_device.sh ewCont natDS modem4",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -704,7 +708,8 @@
         "property": {
           "outband": false,
           "scripts": [
-            "sdwan_controller.sh pRouter1"
+            "sdwan_controller.sh pRouter1",
+            "generate_token.sh 1"
           ]
         },
         "group": [200]
