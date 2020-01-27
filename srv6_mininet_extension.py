@@ -102,6 +102,42 @@ class SRv6Topo(Topo):
             self.customer_facing_net = generator.customerFacingNetAllocator.net
             self.access_net = generator.accessNetAllocator.net
             self.mgmtNet = generator.mgmtNetAllocator.net
+        # Identify ospf routers and default routes
+        self.ospf_routers = list()
+        self.default_vias = dict()
+        for router, p_router_properties in zip(self.routers, p_routers_properties):
+            if p_router_properties.get('enable_ospf', False):
+                self.ospf_routers.append(router)
+            self.default_vias[router] = p_router_properties.get(
+                'default_via', None)
+        # Identify default via for the hosts
+        for host, p_host_properties in zip(self._hosts, p_hosts_properties):
+            self.default_vias[host] = p_host_properties.get(
+                'default_via', None)
+        # Process links
+        self.core_links = parser.getCoreLinks()
+        p_core_links_properties = parser.getCoreLinksProperties()
+        self.edge_links = parser.getEdgeLinks()
+        p_edge_links_properties = parser.getEdgeLinksProperties()
+        self.mgmt_links = parser.getMgmtLinks()
+        p_mgmt_links_properties = parser.getMgmtLinksProperties()
+        # Second step is the generation of the nodes parameters
+        # Generation of the routers parameters
+        routers_properties = generator.getRoutersProperties(self.routers)
+        for (router_properties,
+             p_router_properties) in zip(routers_properties,
+                                         p_routers_properties):
+            p_router_properties['loopback'] = router_properties.loopback
+            p_router_properties['routerid'] = router_properties.routerid
+            p_router_properties['routernet'] = router_properties.routernet
+        self.routers_properties = p_routers_properties
+        # Generation of the hosts parameters
+        hosts_properties = generator.getHostsProperties(self._hosts)
+        for (host_properties,
+             p_host_properties) in zip(hosts_properties,
+                                       p_hosts_properties):
+            p_host_properties['loopback'] = host_properties.loopback
+        self.hosts_properties = p_hosts_properties
         # Identify the controller
         if len(self.controllers) == 0:
             self.controller = None
@@ -140,42 +176,6 @@ class SRv6Topo(Topo):
                 p_wanrouter_properties = dict()
             p_wanrouter_properties['loopback'] = wanrouters_properties[0].loopback
             self.wanrouter_properties = p_wanrouter_properties
-        # Identify ospf routers and default routes
-        self.ospf_routers = list()
-        self.default_vias = dict()
-        for router, p_router_properties in zip(self.routers, p_routers_properties):
-            if p_router_properties.get('enable_ospf', False):
-                self.ospf_routers.append(router)
-            self.default_vias[router] = p_router_properties.get(
-                'default_via', None)
-        # Identify default via for the hosts
-        for host, p_host_properties in zip(self._hosts, p_hosts_properties):
-            self.default_vias[host] = p_host_properties.get(
-                'default_via', None)
-        # Process links
-        self.core_links = parser.getCoreLinks()
-        p_core_links_properties = parser.getCoreLinksProperties()
-        self.edge_links = parser.getEdgeLinks()
-        p_edge_links_properties = parser.getEdgeLinksProperties()
-        self.mgmt_links = parser.getMgmtLinks()
-        p_mgmt_links_properties = parser.getMgmtLinksProperties()
-        # Second step is the generation of the nodes parameters
-        # Generation of the routers parameters
-        routers_properties = generator.getRoutersProperties(self.routers)
-        for (router_properties,
-             p_router_properties) in zip(routers_properties,
-                                         p_routers_properties):
-            p_router_properties['loopback'] = router_properties.loopback
-            p_router_properties['routerid'] = router_properties.routerid
-            p_router_properties['routernet'] = router_properties.routernet
-        self.routers_properties = p_routers_properties
-        # Generation of the hosts parameters
-        hosts_properties = generator.getHostsProperties(self._hosts)
-        for (host_properties,
-             p_host_properties) in zip(hosts_properties,
-                                       p_hosts_properties):
-            p_host_properties['loopback'] = host_properties.loopback
-        self.hosts_properties = p_hosts_properties
         # Generation of the controllers parameters
         controllers_properties = generator.getHostsProperties(self.controllers)
         for (controller_properties,
