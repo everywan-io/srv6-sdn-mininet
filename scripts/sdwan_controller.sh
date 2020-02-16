@@ -31,6 +31,13 @@ echo $PATH
 #echo $NEIGHS
 echo $ips
 
+<<<<<<< Updated upstream
 #python -m srv6_sdn_control_plane.srv6_controller --ips $ips --period 10 --topology /tmp/topo.json --topo-graph /tmp/topo_graph.svg --sb-interface gRPC --nb-interface gRPC --grpc-server-ip :: --grpc-server-port 12345
 python -m srv6_sdn_control_plane.srv6_controller --ips $ips --period 10 --topology /tmp/topo.json --topo-graph /tmp/topo_graph.svg --sb-interface gRPC --nb-interface gRPC --grpc-server-ip :: --grpc-server-port 12345 --pymerang-server-ip ${NODES[$HOSTNAME]} --pymerang-server-port 50061
 #python -m nat_utils.nat_discovery_server
+=======
+# Start the etherws virtual switch
+etherws sw
+# Start the SD-WAN controller
+stdbuf -i0 -o0 -e0 python -m srv6_sdn_control_plane.srv6_controller --ips $ips --period 10 --topology /tmp/topo.json --topo-graph /tmp/topo_graph.svg --sb-interface gRPC --nb-interface gRPC --grpc-server-ip :: --grpc-server-port 54321 --pymerang-server-ip ${NODES[$HOSTNAME]} --pymerang-server-port 50061 &
+>>>>>>> Stashed changes
