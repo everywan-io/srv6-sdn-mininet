@@ -1,16 +1,16 @@
 #!/bin/bash
 
-source nodes.sh
-source hostname.sh
+# This script implements the functionalities of a NAT discovery server
 
-ip=${NODES[$HOSTNAME]}
+# General imports
+source ips.sh
 
-if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo IPv4
-  server_ip="0.0.0.0"
-else
-  echo IPv6
-  server_ip="::"
-fi
+# Generate the list of listner IP addresses
+listening_ips=""
+for ip in "${IPS[@]}"
+do
+    listening_ips+="-L ${ip} "
+done
 
-python -m nat_utils.nat_discovery_server --nat-discovery-server-ip ${server_ip}
+# Start the server
+turnserver -S ${listening_ips}

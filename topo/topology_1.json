@@ -16,6 +16,34 @@
          }
       },
       {
+        "source":"natDS",
+        "target":"pRouter1",
+        "view": "Data",
+        "info": {
+          "property": {
+             "bw": 1,
+             "delay": 1000,
+             "type": "core",
+             "is_private": false
+          },
+          "group": ""
+        }
+     },
+     {
+      "source":"natDS",
+      "target":"pRouter2",
+      "view": "Data",
+      "info": {
+        "property": {
+           "bw": 1,
+           "delay": 1000,
+           "type": "core",
+           "is_private": false
+        },
+        "group": ""
+      }
+   },
+      {
          "source":"ewED2",
          "target":"modem2",
          "view": "Data",
@@ -464,7 +492,8 @@
         "property": {
           "default_via": "modem1",
           "scripts": [
-            "edge_device.sh ewCont"
+            "edge_device.sh ewCont natDS modem1",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -477,7 +506,8 @@
         "property": {
           "default_via": "modem2",
           "scripts": [
-            "edge_device.sh ewCont"
+            "edge_device.sh ewCont natDS modem2",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -490,7 +520,8 @@
         "property": {
           "default_via": "modem3",
           "scripts": [
-            "edge_device.sh ewCont"
+            "edge_device.sh ewCont natDS modem3",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -503,7 +534,8 @@
         "property": {
           "default_via": "modem4",
           "scripts": [
-            "edge_device.sh ewCont"
+            "edge_device.sh ewCont natDS modem4",
+            "copy_token_to_device.sh 1"
           ]
         },
         "group": [200]
@@ -674,10 +706,10 @@
       "info": {
         "type": "Controller",
         "property": {
-          "outband": true,
+          "outband": false,
           "scripts": [
-            "nat_discovery_server.sh",
-            "sdwan_controller.sh pRouter1"
+            "sdwan_controller.sh pRouter1",
+            "generate_token.sh 1"
           ]
         },
         "group": [200]
@@ -693,6 +725,19 @@
         "group": [200]
       },
       "id": "wanrouter"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+            "nat_discovery_server.sh"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "natDS"
      }
    ],
    "graph_parameters":{

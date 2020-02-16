@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to configure a stateless firewall
+# Script to configure a stateless firewall allowing only TCP traffic
 
 # First cleanup everything
 iptables -t filter -F

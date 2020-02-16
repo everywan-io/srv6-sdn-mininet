@@ -1,36 +1,40 @@
 #!/bin/bash
 
-#NAME=$1
-#ID=$2
+# This script implements the functionalities of an EveryWAN Edge Device
 
-CONTROLLER=$1
-
+# General imports
 source devid.sh
 source hostname.sh
-#source neighs.sh
 source nodes.sh
+source ips.sh
+source interfaces.sh
 
-echo $CONTROLLER
-echo $DEVICEID
-echo ${NEIGHS[$CONTROLLER]}
+# Contoller hostname
+CONTROLLER=$1
+# NAT discovery server hostname
+NAT=$2
+# Neighbor through which the NAT discovery request has to be sent
+NAT_DISCOVERY_CLIENT=$3
 
-#CONTROLLER=${NEIGHS[$CONTROLLER]}
-
+# Get the IP address of the controller
 CONTROLLER=${NODES[$CONTROLLER]}
+# Get the IP address of the NAT discovery server
+NAT=${NODES[$NAT]}
+# Get the IP address of the output interface used by the NAT discovery procedure
+NAT_DISCOVERY_CLIENT=${IPS[${INTERFACES[$NAT_DISCOVERY_CLIENT]}]}
 
-JSON_STRING='{"id":"'$DEVICEID'","features":[{"name":"gRPC","port":12345},{"name":"SSH","port":22}]}' #,"features":"[{"name": "gRPC", "port": 12345}, {"name": "SSH", "port": 22}]"}'
+# Generate the device configuration
+CONFIG='{"id":"'$DEVICEID'","features":[{"name":"gRPC","port":12345},{"name":"SSH","port":22}]}'
+# Export the configuration
+jq -n ${CONFIG} > /tmp/config-${HOSTNAME}.json
 
-jq -n ${JSON_STRING} > /tmp/config-${HOSTNAME}.json
-
-echo ${PATH}
-echo ${CONTROLLER}
-
-#echo $JSON_STRING > device.json
-#cp device_config.json /tmp/config-$NAME.json
-
-#jq --arg id "$ID" '.address = $id' /tmp/config/config-$NAME.json > "$tmp" && mv "$tmp" /tmp/config/config-$NAME.json
-
+# Start etherws virtual switch
+etherws sw
+# Wait for the controller getting ready
+sleep 15
+# Start the southbound gRPC server
+python -m srv6_sdn_data_plane.southbound.grpc.sb_grpc_server --debug &
+# Wait
 sleep 5
-python -m pymerang.pymerang_client --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $CONTROLLER --server-ip $CONTROLLER --server-port 50061
-sleep 5
-python -m srv6_sdn_data_plane.southbound.grpc.sb_grpc_server --debug
+# Start the registration client
+python -m pymerang.pymerang_client --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --server-ip $CONTROLLER --server-port 50061 --token-file ./token &
