@@ -11,7 +11,7 @@ N=$1
 # Get the IP address of the controller
 controller_ip=${NODES[$HOSTNAME]}
 # Generate the tenant configuration
-CONFIG='[{"port":40000,"info":"user"}]'
+CONFIG='[{"tenantid": "1", "vxlan_port":40000, "tenant_info":"tenant01"}]'
 echo "$CONFIG" > /tmp/tenant_config.json
 # Wait for controller getting ready
 sleep 5
