@@ -120,6 +120,7 @@ class SRv6Router(Host):
             self.exec_cmd = self.cmdPrint
         else:
             self.exec_cmd = self.cmd
+        self.exec_cmd("for session in $(screen -ls | grep -o '[0-9]*\.%s'); do screen -S ${session} -X quit; done" % self.name)
 
     # Config hook
     def config(self, **kwargs):
@@ -268,13 +269,22 @@ class SRv6Router(Host):
         # This solves the issue of python commands executed
         # outside the virtual environment
         self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
+        self.exec_cmd('export SCREENDIR=/run/screen/S-%s' % self.name)
         # Run scripts
+        scripts = ''
         for script in kwargs.get('scripts', []):
             # Change directory to the host dir
             self.exec_cmd('cd %s' % self.dir)
-            # Execute the script
+            # Get full path
             script_path = os.path.abspath(os.path.join('scripts', script))
-            self.exec_cmd('bash %s &' % script_path)
+            # Append the script to the scripts
+            scripts += script_path + ' & '
+        if scripts != '':
+            # This line forces screen to keep opened
+            # after the scripts termination
+            scripts = scripts[:-3] + '; exec bash'
+            # Execute the scripts
+            self.exec_cmd("screen -dmS %s bash -c '%s'" % (self.name, scripts))
 
     # Configure and start zebra for IPv6 emulation
     def start_zebra_ipv6(self, **kwargs):
@@ -565,9 +575,15 @@ class SRv6Router(Host):
             self.exec_cmd("ospfd -f %s/ospfd.conf -d -z %s/zebra.sock -i "
                           "%s/ospfd.pid" % (self.dir, self.dir, self.dir))
 
+    # Terminate node
+    def terminate(self):
+        # Stop screen session
+        #self.exec_cmd('screen -XS %s quit' % self.name)
+        self.exec_cmd("for session in $(screen -ls | grep -o '[0-9]*\.%s'); do screen -S ${session} -X quit; done" % self.name)
+        Host.terminate(self)
+
     # Clean up the environment
     def cleanup(self):
-
         Host.cleanup(self)
         # Rm dir
         if os.path.exists(self.dir):
@@ -591,6 +607,7 @@ class MHost(Host):
             self.exec_cmd = self.cmdPrint
         else:
             self.exec_cmd = self.cmd
+        self.exec_cmd("for session in $(screen -ls | grep -o '[0-9]*\.%s'); do screen -S ${session} -X quit; done" % self.name)
 
     # Config hook
     def config(self, **kwargs):
@@ -728,13 +745,36 @@ class MHost(Host):
         # This solves the issue of python commands executed
         # outside the virtual environment
         self.exec_cmd('export PATH=%s:$PATH' % os.path.dirname(PYTHON_PATH))
+        self.exec_cmd('export SCREENDIR=/run/screen/S-%s' % self.name)
         # Run scripts
+        scripts = ''
         for script in kwargs.get('scripts', []):
             # Change directory to the host dir
             self.exec_cmd('cd %s' % self.dir)
-            # Execute the script
+            # Get full path
             script_path = os.path.abspath(os.path.join('scripts', script))
-            self.exec_cmd('bash %s &' % script_path)
+            # Append the script to the scripts
+            scripts += script_path + ' & '
+        if scripts != '':
+            # This line forces screen to keep opened
+            # after the scripts termination
+            scripts = scripts[:-3] + '; exec bash'
+            # Execute the scripts
+            self.exec_cmd("screen -dmS %s bash -c '%s'" % (self.name, scripts))
+
+    # Terminate node
+    def terminate(self):
+        # Stop screen session
+        #self.exec_cmd('screen -XS %s quit' % self.name)
+        self.exec_cmd("for session in $(screen -ls | grep -o '[0-9]*\.%s'); do screen -S ${session} -X quit; done" % self.name)
+        Host.terminate(self)
+
+    # Clean up the environment
+    def cleanup(self):
+        Host.cleanup(self)
+        # Rm dir
+        if os.path.exists(self.dir):
+            shutil.rmtree(self.dir)
 
 
 # Abstraction to model a SRv6Controller
