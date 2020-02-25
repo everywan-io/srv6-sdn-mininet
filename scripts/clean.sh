@@ -19,3 +19,4 @@ mongo "mongodb://root:12345678@localhost:27017/EveryWan?authSource=admin&readPre
 mongo "mongodb://root:12345678@localhost:27017/EveryWan?authSource=admin&readPreference=primary&appname=MongoDB%20Compass&ssl=false" --eval "db.tenants.remove({})"
 #mongo "mongodb://root:12345678@localhost:27017/EveryWan?authSource=admin&readPreference=primary&appname=MongoDB%20Compass&ssl=false" --eval "db.tenants.insert({\"tenantid\": \"1\", \"conf\": {\"port\": NumberInt(4789)}})"  # TODO to be removed
 mongo "mongodb://root:12345678@localhost:27017/EveryWan?authSource=admin&readPreference=primary&appname=MongoDB%20Compass&ssl=false" --eval "db.tenants.insert({\"tenantid\": \"1\"})"  # TODO to be removed
+mongo "mongodb://root:12345678@localhost:27017/EveryWan?authSource=admin&readPreference=primary&appname=MongoDB%20Compass&ssl=false" --eval "db.configuration.remove({})"
