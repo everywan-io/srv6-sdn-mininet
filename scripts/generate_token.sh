@@ -14,7 +14,7 @@ controller_ip=${NODES[$HOSTNAME]}
 CONFIG='[{"tenantid": "1", "vxlan_port":40000, "tenant_info":"tenant01"}]'
 echo "$CONFIG" > /tmp/tenant_config.json
 # Wait for controller getting ready
-sleep 5
+sleep 10
 # Generate N tokens
 for (( i=1; i<=N; i++ ))
 do
