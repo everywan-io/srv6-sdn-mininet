@@ -1,0 +1,920 @@
+{
+   "edges":[ 
+      {
+        "source":"natDS",
+        "target":"pRouter1",
+        "view": "Data",
+        "info": {
+          "property": {
+             "bw": 1,
+             "delay": 1000,
+             "type": "core",
+             "is_private": false
+          },
+          "group": ""
+        }
+     },
+     {
+      "source":"natDS",
+      "target":"pRouter2",
+      "view": "Data",
+      "info": {
+        "property": {
+           "bw": 1,
+           "delay": 1000,
+           "type": "core",
+           "is_private": false
+        },
+        "group": ""
+      }
+   },
+      {
+         "source":"ewED1",
+         "target":"modem1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "access",
+              "is_stub": false,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ewED2",
+         "target":"modem2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 5,
+              "delay": 200,
+              "type": "access",
+              "is_stub": false,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ewED3",
+         "target":"modem3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "access",
+              "is_stub": true,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"ewED4",
+         "target":"modem4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "access",
+              "is_stub": true,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter5",
+         "target":"pRouter1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "core",
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter5",
+         "target":"pRouter2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "core",
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter5",
+         "target":"pRouter3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "core",
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter5",
+         "target":"pRouter4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "core",
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"pRouter5",
+         "target":"pRouter6",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 10,
+              "delay": 100,
+              "type": "core",
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host1ewED1",
+         "target":"ewED1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host2ewED1",
+         "target":"ewED1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host3ewED1",
+         "target":"ewED1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host1ewED2",
+         "target":"ewED2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host2ewED2",
+         "target":"ewED2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host3iR2",
+         "target":"iRouter2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host1ewED3",
+         "target":"ewED3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host2ewED3",
+         "target":"ewED3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host3iR3",
+         "target":"iRouter3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host1ewED4",
+         "target":"ewED4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host2ewED4",
+         "target":"ewED4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"host3ewED4",
+         "target":"ewED4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "edge",
+              "is_stub": true,
+              "is_private": true
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"modem1",
+         "target":"pRouter1",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "access",
+              "is_stub": false,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"modem2",
+         "target":"pRouter2",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "access",
+              "is_stub": false,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"modem3",
+         "target":"pRouter3",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "access",
+              "is_stub": false,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+         "source":"modem4",
+         "target":"pRouter4",
+         "view": "Data",
+         "info": {
+           "property": {
+              "bw": 1,
+              "delay": 1000,
+              "type": "access",
+              "is_stub": false,
+              "is_private": false
+           },
+           "group": ""
+         }
+      },
+      {
+        "source":"ewCont",
+        "target":"wanrouter",
+        "view": "Data",
+        "info": {
+          "property": {
+             "bw": 1,
+             "delay": 1000,
+             "type": "mgmt"
+          },
+          "group": ""
+        }
+     },
+     {
+       "source":"pRouter6",
+       "target":"wanrouter",
+       "view": "Data",
+       "info": {
+         "property": {
+            "bw": 1,
+            "delay": 1000,
+            "type": "mgmt"
+         },
+         "group": ""
+       }
+    },
+    {
+      "source":"host5iR2",
+      "target":"iRouter2",
+      "view": "Data",
+      "info": {
+        "property": {
+          "bw": 1,
+          "delay": 1000,
+          "type": "edge",
+          "is_stub": true,
+          "is_private": true
+        },
+        "group": ""
+      }
+  },
+    {
+      "source":"host4iR2",
+      "target":"iRouter2",
+      "view": "Data",
+      "info": {
+        "property": {
+          "bw": 1,
+          "delay": 1000,
+          "type": "edge",
+          "is_stub": true,
+          "is_private": true
+        },
+        "group": ""
+      }
+  },
+  {
+    "source":"ewED2",
+    "target":"iRouter2",
+    "view": "Data",
+    "info": {
+      "property": {
+        "bw": 1,
+        "delay": 1000,
+        "type": "edge",
+        "is_stub": true,
+        "is_private": true
+      },
+      "group": ""
+    }
+  },
+  {
+    "source":"ewED3",
+    "target":"iRouter3",
+    "view": "Data",
+    "info": {
+      "property": {
+        "bw": 1,
+        "delay": 1000,
+        "type": "edge",
+        "is_stub": true,
+        "is_private": true
+      },
+      "group": ""
+    }
+  },
+  {
+    "source":"host4iR3",
+    "target":"iRouter3",
+    "view": "Data",
+    "info": {
+      "property": {
+        "bw": 1,
+        "delay": 1000,
+        "type": "edge",
+        "is_stub": true,
+        "is_private": true
+      },
+      "group": ""
+    }
+  },
+  {
+    "source":"host5iR3",
+    "target":"iRouter3",
+    "view": "Data",
+    "info": {
+      "property": {
+        "bw": 1,
+        "delay": 1000,
+        "type": "edge",
+        "is_stub": true,
+        "is_private": true
+      },
+      "group": ""
+    }
+  }
+   ],
+   "vertices":[
+   	{
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter1"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter2"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter3"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter4"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter5"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true
+        },
+        "group": [200]
+      },
+      "id": "pRouter6"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "default_via": "modem1",
+          "scripts": [
+            "edge_device.sh ewCont natDS modem1",
+            "copy_token_to_device.sh 1"
+        
+          
+          ]
+        },
+        "group": [200]
+      },
+      "id": "ewED1"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "default_via": "modem2",
+          "scripts": [
+            "edge_device.sh ewCont natDS modem2",
+            "copy_token_to_device.sh 1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "ewED2"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "default_via": "modem3",
+          "scripts": [
+            "edge_device.sh ewCont natDS modem3",
+            "copy_token_to_device.sh 1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "ewED3"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "default_via": "modem4",
+          "scripts": [
+            "edge_device.sh ewCont natDS modem4",
+            "copy_token_to_device.sh 1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "ewED4"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+            "nat.sh pRouter1",
+            "port_forwarding.sh pRouter1 ewED1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "modem1"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+            "nat.sh pRouter2",
+            "port_forwarding.sh pRouter2 ewED2"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "modem2"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+    
+          ]
+        },
+        "group": [200]
+      },
+      "id": "modem3"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+         
+          ]
+        },
+        "group": [200]
+      },
+      "id": "modem4"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED1"
+        },
+        "group": [200]
+      },
+      "id": "host1ewED1"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED1"
+        },
+        "group": [200]
+      },
+      "id": "host2ewED1"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED1"
+        },
+        "group": [200]
+      },
+      "id": "host3ewED1"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED2"
+        },
+        "group": [200]
+      },
+      "id": "host1ewED2"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED2"
+        },
+        "group": [200]
+      },
+      "id": "host2ewED2"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter2"
+        },
+        "group": [200]
+      },
+      "id": "host3iR2"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED3"
+        },
+        "group": [200]
+      },
+      "id": "host1ewED3"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED3"
+        },
+        "group": [200]
+      },
+      "id": "host2ewED3"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter3"
+        },
+        "group": [200]
+      },
+      "id": "host3iR3"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED4"
+        },
+        "group": [200]
+      },
+      "id": "host1ewED4"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED4"
+        },
+        "group": [200]
+      },
+      "id": "host2ewED4"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "ewED4"
+        },
+        "group": [200]
+      },
+      "id": "host3ewED4"
+     },
+     {
+      "info": {
+        "type": "Controller",
+        "property": {
+          "outband": false,
+          "scripts": [
+            "sdwan_controller.sh pRouter6",
+            "generate_token.sh 1"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "ewCont"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+            "type": "WANRouter"
+        },
+        "group": [200]
+      },
+      "id": "wanrouter"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": true,
+          "scripts": [
+            "nat_discovery_server.sh"
+          ]
+        },
+        "group": [200]
+      },
+      "id": "natDS"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": false,
+          "default_via": "ewED2",
+          "scripts": [
+      
+          ]
+        },
+        "group": [200]
+      },
+      "id": "iRouter2"
+     },
+     {
+      "info": {
+        "type": "Router",
+        "property": {
+          "enable_ospf": false,
+          "default_via": "ewED3",
+          "scripts": [
+      
+          ]
+        },
+        "group": [200]
+      },
+      "id": "iRouter3"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter2"
+        },
+        "group": [200]
+      },
+      "id": "host5iR2"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter2"
+        },
+        "group": [200]
+      },
+      "id": "host4iR2"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter3"
+        },
+        "group": [200]
+      },
+      "id": "host5iR3"
+     },
+     {
+      "info": {
+        "type": "Host",
+        "property": {
+          "default_via": "iRouter3"
+        },
+        "group": [200]
+      },
+      "id": "host4iR3"
+     }
+   ],
+   "graph_parameters":{
+        "testbed":"MININET"
+   }
+}

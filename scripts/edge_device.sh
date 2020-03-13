@@ -38,4 +38,4 @@ sleep 15
 sleep 5
 # Start the registration client
 #python -m pymerang.pymerang_client --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --server-ip $CONTROLLER --server-port 50061 --token-file ./token &
-python -m srv6_sdn_data_plane.ew_edge_device --config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --pymerang-server-ip $CONTROLLER --pymerang-server-port 50061 --token-file ./token &
+python -m srv6_sdn_data_plane.ew_edge_device --device-config-file /tmp/config-${HOSTNAME}.json --nat-discovery-server-ip $NAT --nat-discovery-client-ip $NAT_DISCOVERY_CLIENT --pymerang-server-ip $CONTROLLER --pymerang-server-port 50061 --token-file ./token &
