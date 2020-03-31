@@ -33,11 +33,11 @@ etherws sw
 # Wait for the controller getting ready
 sleep 15
 # Generate server key
-openssl genrsa -out server.key 2048
+#openssl genrsa -out server.key 2048
 # Generate server certificate signing request
-openssl req -new -key server.key -out server.csr -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=$DEVICEID"
+#openssl req -new -key server.key -out server.csr -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=$DEVICEID"
 # Generate server certificate
-openssl x509 -req -days 365 -in server.csr -CA /tmp/ewCont/ca.crt -CAkey /tmp/ewCont/ca.key -set_serial 01 -out server.crt
+#openssl x509 -req -days 365 -in server.csr -CA /tmp/ewCont/ca.crt -CAkey /tmp/ewCont/ca.key -set_serial 01 -out server.crt
 # Start the southbound gRPC server
 #python -m srv6_sdn_data_plane.southbound.grpc.sb_grpc_server --debug &
 # Wait
