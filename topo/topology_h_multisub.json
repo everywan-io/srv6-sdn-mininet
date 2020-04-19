@@ -37,8 +37,8 @@
               "bw": 1,
               "delay": 1000,
               "type": "access",
-              "is_stub": false,
-              "is_private": true
+              "is_stub": true,
+              "is_private": false
            },
            "group": ""
          }
@@ -82,8 +82,8 @@
               "bw": 10,
               "delay": 100,
               "type": "access",
-              "is_stub": true,
-              "is_private": false
+              "is_stub": false,
+              "is_private": true
            },
            "group": ""
          }
@@ -626,7 +626,6 @@
         "property": {
           "default_via": "modem4",
           "scripts": [
-            "edge_device.sh ewCont natDS modem4",
             "copy_token_to_device.sh 1"
           ]
         },
@@ -640,8 +639,7 @@
         "property": {
           "enable_ospf": true,
           "scripts": [
-            "nat.sh pRouter1",
-            "port_forwarding.sh pRouter1 ewED1"
+            
           ]
         },
         "group": [200]
@@ -681,7 +679,8 @@
         "property": {
           "enable_ospf": true,
           "scripts": [
-         
+            "nat.sh pRouter4",
+            "port_forwarding.sh pRouter4 ewED4"
           ]
         },
         "group": [200]
