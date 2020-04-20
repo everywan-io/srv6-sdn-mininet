@@ -29,7 +29,7 @@ CONFIG='{"id":"'$DEVICEID'","features":[{"name":"gRPC","port":12345},{"name":"SS
 jq -n ${CONFIG} > /tmp/config-${HOSTNAME}.json
 
 # Start etherws virtual switch
-etherws sw
+#etherws sw
 # Wait for the controller getting ready
 #sleep 15
 # Start the southbound gRPC server
