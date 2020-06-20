@@ -94,7 +94,6 @@ class SRv6Topo(Topo):
             self.customer_facing_net = generator.customerFacingNetAllocator.net
             self.access_net = generator.accessNetAllocator.net
             self.mgmtNet = generator.mgmtNetAllocator.net
-            self.mgmtNet = generator.mgmtNetAllocator.net
         else:
             generator = IPv6PropertiesGenerator()
             self.netprefix = IPv6NetAllocator.prefix
@@ -576,13 +575,13 @@ class SRv6Topo(Topo):
             }
             self.nodeInfo(self.controller)['nets'].append(net)
             self.nodeInfo(self.mgmt)['routes'].append(
-                {'dest': self.mgmtIP.net, 'via': self.mgmtIP.iplhs})
+                {'dest': self.mgmtIP.net, 'via': self.mgmtIP.iprhs})
             self.nodeInfo(self.mgmt)['routes'].append(
-                {'dest': self._net, 'via': self.mgmtIP.iplhs})
+                {'dest': self._net, 'via': self.mgmtIP.iprhs})
             #self.nodeInfo(self.mgmt)['routes'].append({'dest': self.customer_facing_net, 'via': self.mgmtIP.iplhs})
             #self.nodeInfo(self.mgmt)['routes'].append({'dest': self.access_net, 'via': self.mgmtIP.iplhs})
             self.nodeInfo(self.mgmt)['routes'].append(
-                {'dest': controller_loopbackip, 'via': self.mgmtIP.iplhs})
+                {'dest': controller_loopbackip, 'via': self.mgmtIP.iprhs})
             #self.nodeInfo(self.mgmt)['routes'].append({'dest': controller_wan_router_net, 'via': self.mgmtIP.iplhs})
 
 
