@@ -19,7 +19,7 @@ sleep 10
 for (( i=1; i<=N; i++ ))
 do
   # Generate the token
-  token="$(python -m configure_tenant --controller-ip $controller_ip --controller-port 54321 --config-path /tmp/tenant_config.json)"
+  token="$(python -m configure_tenant -s -c /tmp/ca.crt --controller-ip $controller_ip --controller-port 54321 --config-path /tmp/tenant_config.json)"
   token=${token##*TOKEN:  }
   echo "$token" > "/tmp/token-$i"
 done
