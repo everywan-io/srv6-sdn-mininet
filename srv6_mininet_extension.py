@@ -583,6 +583,22 @@ class SRv6Topo(Topo):
             self.nodeInfo(self.mgmt)['routes'].append(
                 {'dest': controller_loopbackip, 'via': self.mgmtIP.iprhs})
             #self.nodeInfo(self.mgmt)['routes'].append({'dest': controller_wan_router_net, 'via': self.mgmtIP.iplhs})
+            net = {
+                'intf': lhsintf,
+                'ip': '10.255.255.254/31',
+                'bw': 1000,
+                'delay': 0,
+                'net': '10.255.255.254/31',
+            }
+            self.nodeInfo(self.mgmt)['nets'].append(net)
+            net = {
+                'intf': rhsintf,
+                'ip': '10.255.255.255/31',
+                'bw': 1000,
+                'delay': 0,
+                'net': '10.255.255.254/31',
+            }
+            self.nodeInfo(self.controller)['nets'].append(net)
 
 
 # Utility function to dump relevant information of the emulation
