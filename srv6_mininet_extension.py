@@ -318,7 +318,7 @@ class SRv6Topo(Topo):
                          sshd=True, in_band=True,
                          scripts=scripts, loopbackip=loopbackip,
                          nodes=dict(),
-                         inNamespace=True,
+                         inNamespace=False,
                          nets=[], routes=[], neighs=[],
                          interfaces=[], debug=self.debug)
             # Add node to the topology graph
